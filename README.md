@@ -12,7 +12,7 @@ npm start
 
 ### Build
 ```shell
-npm package
+npm run package
 ```
 
 Artifacts will appear in `out` folder.
