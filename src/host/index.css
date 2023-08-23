@@ -1,0 +1,89 @@
+*{
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #15202B;
+}
+
+::-webkit-scrollbar {
+  height: 15px;
+  background-color: #15202B;
+  width: 15px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #395461;
+  border-radius: 10px;
+}
+
+#root{
+  width: 100%;
+  height: 100%;
+}
+
+.header{
+  min-width: 50px;
+  max-width: 50px;
+}
+
+.app{
+  display:flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+}
+
+.pane-container {
+  flex-grow: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+}
+
+.pane{
+  min-width: 320px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #203242;
+  border-radius: 5px;
+}
+
+.pane-header{
+  height: 50px;
+  display: flex;
+  flex-direction: row;
+}
+
+.pane-header-icon{
+  width: 50px;
+  padding: 10px;
+}
+
+.pane-header-control{
+  flex-grow: 1;
+}
+
+.pane-header-menu-button{
+  width: 50px;
+}
+
+
+
+.pane-content{
+  flex-grow: 1;
+}
+
+.user-icon{
+  background-size: cover;
+  border-radius: 999px;
+  width: 100%;
+  height: 100%;
+}

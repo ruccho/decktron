@@ -1,0 +1,35 @@
+::-webkit-scrollbar {
+  height: 15px;
+  background-color: #15202B;
+  width: 15px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #395461;
+  border-radius: 10px;
+}
+
+header {
+  display: none !important;
+}
+
+.r-33ulu8 {
+  width: 100% !important;
+}
+
+.r-1hycxz {
+  display: none !important;
+}
+
+.r-1ye8kvj {
+  max-width: none !important;
+}
+
+.r-rthrr5 {
+  width: 100% !important;
+}
+
+article>div>div>div.css-1dbjc4n.r-18u37iz>div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu>div:nth-child(2)>div {
+  max-height: 100px;
+  overflow: hidden;
+}
