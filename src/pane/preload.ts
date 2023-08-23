@@ -2,17 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 // eslint-disable-next-line no-var
 declare var window: Window & typeof globalThis & {
-    __INITIAL_STATE__: {
-        entities: {
-            users: {
-                entities: Record<string, {
-                    name: string;
-                    screen_name: string;
-                    profile_banner_url: string;
-                }>
-            }
-        }
-    }
+    __INITIAL_STATE__: any
 };
 
 if (location.host === "twitter.com") {
@@ -26,15 +16,18 @@ function preload() {
             (header as HTMLElement).style.display = "none";
         });
 
+        const themeColor = document.querySelector("meta[name='theme-color']")?.getAttribute("content");
+
+        if(themeColor)
+        {
+            ipcRenderer.send("theme-color", themeColor);
+        }
+
+
         document.querySelectorAll("script").forEach(element => {
             if (element.text.startsWith("window.__INITIAL_STATE__")) {
                 eval(element.text);
-
-                const users = Object.values(window.__INITIAL_STATE__.entities.users.entities);
-                if (users.length > 0) {
-                    const user = users[0];
-                    ipcRenderer.send("user", user);
-                }
+                ipcRenderer.send("initial-state", window.__INITIAL_STATE__);
             }
 
         })
