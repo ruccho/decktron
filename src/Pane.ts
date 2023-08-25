@@ -23,7 +23,8 @@ export class Pane {
         this.view = new BrowserView({
             webPreferences: {
                 preload: PANE_VIEW_PRELOAD_WEBPACK_ENTRY,
-                session: session.electronSession
+                session: session.electronSession,
+                contextIsolation: false
             }
         });
 
@@ -55,11 +56,18 @@ export class Pane {
 
             this.sendData();
         })
+        this.view.webContents.ipc.on("log", (event, value) => {
+            console.log(value);
+        });
 
         this.host.on(this.dataChannel, () => {
             this.host.send(this.dataChannel, this.data);
         });
         this.host.send(this.dataChannel, this.data);
+        
+        this.host.on(`pane-${this.id}-refresh`, () => {
+            this.fetchInitialOrTop();
+        });
 
         this.view.webContents.loadURL(initialUrl);
         this.view.webContents.setWindowOpenHandler(({ url }) => {
@@ -89,5 +97,9 @@ export class Pane {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     public dispose(){
 
+    }
+
+    public fetchInitialOrTop(){
+        this.view.webContents.send("x-fetchInitialOrTop");
     }
 }

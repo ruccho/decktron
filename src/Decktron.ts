@@ -16,6 +16,8 @@ export class Decktron {
             },
         });
 
+        mainWindow.setMenu(null);
+
         mainWindow.loadURL(HOST_WEBPACK_ENTRY);
 
         this.paneHost = new PaneHost(mainWindow);

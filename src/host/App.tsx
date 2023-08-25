@@ -13,5 +13,9 @@ const App: React.FC = () => {
 
 document.body.innerHTML = `<div id="root"></div>`;
 
-const root = createRoot(document.getElementById("root"));
-root.render(<App />);
+const rootContainer = document.getElementById("root");
+
+if (rootContainer) {
+  const root = createRoot(rootContainer);
+  root.render(<App />);
+}

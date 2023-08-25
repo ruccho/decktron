@@ -43,6 +43,9 @@ export class PaneHost {
                     this.add(this.sessions.get(s.toString()), entryUrl);
                 }
             }
+
+            //const firstPane = this.panes[0];
+            //firstPane.view.webContents.openDevTools();
         })
 
 
