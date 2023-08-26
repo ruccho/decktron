@@ -7,7 +7,3 @@ import { IpcRenderer, ipcRenderer } from "electron";
 declare var window: {ipcRenderer: IpcRenderer};
 
 window.ipcRenderer = ipcRenderer;
-
-ipcRenderer.on("theme-color", (event, themeColor: string) => {
-    document.body.style.backgroundColor = themeColor;
-});

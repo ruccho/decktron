@@ -1,11 +1,11 @@
-::-webkit-scrollbar {
+body::-webkit-scrollbar {
   height: 15px;
-  background-color: #15202B;
+  background-color: var(--decktron-pane-background);
   width: 15px;
 }
 
-::-webkit-scrollbar-thumb {
-  background-color: #395461;
+body::-webkit-scrollbar-thumb {
+  background-color: rgba(127, 127, 127, 0.5);
   border-radius: 10px;
 }
 
@@ -34,30 +34,30 @@ article>div>div>div.css-1dbjc4n.r-18u37iz>div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-
   text-overflow: ellipsis;
 }
 
-article > div > div > div.css-1dbjc4n.r-18u37iz > div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu > div:nth-child(2) > div
-{
+article>div>div>div.css-1dbjc4n.r-18u37iz>div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu>div:nth-child(2)>div {
   max-height: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-article > div > div > div.css-1dbjc4n.r-18u37iz > div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu > div.css-1dbjc4n.r-1ssbvtb.r-1s2bzr4 > div.css-1dbjc4n.r-9aw3ui > div > div > div
-{
+article>div>div>div.css-1dbjc4n.r-18u37iz>div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu>div.css-1dbjc4n.r-1ssbvtb.r-1s2bzr4>div.css-1dbjc4n.r-9aw3ui>div>div>div {
   max-height: 100px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
-article > div > div > div.css-1dbjc4n.r-18u37iz > div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu > div.css-1dbjc4n.r-1ssbvtb.r-1s2bzr4 > div > div.css-1dbjc4n.r-18bvks7.r-1867qdf.r-rs99b7.r-1loqt21.r-adacv.r-1ny4l3l.r-1udh08x.r-o7ynqc.r-6416eg > div > div.css-1dbjc4n.r-6gpygo.r-1fz3rvf > div
-{
+article>div>div>div.css-1dbjc4n.r-18u37iz>div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu>div.css-1dbjc4n.r-1ssbvtb.r-1s2bzr4>div>div.css-1dbjc4n.r-18bvks7.r-1867qdf.r-rs99b7.r-1loqt21.r-adacv.r-1ny4l3l.r-1udh08x.r-o7ynqc.r-6416eg>div>div.css-1dbjc4n.r-6gpygo.r-1fz3rvf>div {
   max-height: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-article > div > div > div.css-1dbjc4n.r-18u37iz > div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu > div.css-1dbjc4n.r-1ssbvtb.r-1s2bzr4 > div > div.css-1dbjc4n.r-18bvks7.r-1867qdf.r-rs99b7.r-1loqt21.r-adacv.r-1ny4l3l.r-1udh08x.r-o7ynqc.r-6416eg > div > div.css-1dbjc4n.r-14gqq1x > div > div > div > div
-{
+article>div>div>div.css-1dbjc4n.r-18u37iz>div.css-1dbjc4n.r-1iusvr4.r-16y2uox.r-1777fci.r-kzbkwu>div.css-1dbjc4n.r-1ssbvtb.r-1s2bzr4>div>div.css-1dbjc4n.r-18bvks7.r-1867qdf.r-rs99b7.r-1loqt21.r-adacv.r-1ny4l3l.r-1udh08x.r-o7ynqc.r-6416eg>div>div.css-1dbjc4n.r-14gqq1x>div>div>div>div {
   max-height: 100px;
   overflow: hidden;
+}
+
+main>div>div>div>div>div>div.css-1dbjc4n.r-aqfbo4.r-gtdqiz.r-1gn8etr.r-1g40b8q>div.css-1dbjc4n.r-1e5uvyk>div.css-1dbjc4n.r-1loqt21.r-136ojw6 {
+  display: none !important;
 }

@@ -9,10 +9,10 @@ const entryUrls: { [k: string]: string } = {
     "home": "https://twitter.com/home",
     "explore": "https://twitter.com/explore",
     "notifications": "https://twitter.com/notifications",
+    "settings": "https://twitter.com/settings",
     /*
     "messages": "https://twitter.com/messages",
     "bookmarks": "https://twitter.com/i/bookmarks",
-    "settings": "https://twitter.com/settings",
     */
 }
 
@@ -44,8 +44,10 @@ export class PaneHost {
                 }
             }
 
-            //const firstPane = this.panes[0];
-            //firstPane.view.webContents.openDevTools();
+            /*
+            const firstPane = this.panes[0];
+            firstPane.view.webContents.openDevTools();
+            */
         })
 
 
@@ -85,9 +87,32 @@ export class PaneHost {
 
         const pane = new Pane(this, session, initialUrl);
 
-        this.window.addBrowserView(pane.view);
         this.panes.push(pane);
         this.sendPaneIds();
+    }
+
+    public remove(pane: Pane)
+    {
+        const index = this.panes.indexOf(pane);
+        if(index < 0) return;
+
+        pane.dispose();
+        this.window.removeBrowserView(pane.view);
+        this.panes.splice(index, 1);
+        this.sendPaneIds();
+        this.adjustPanes();
+    }
+
+    public addBrowserView(pane: Pane)
+    {
+        this.window.addBrowserView(pane.view);
+        this.adjustPanes();
+    }
+
+    public removeBrowserView(pane: Pane)
+    {
+        this.window.removeBrowserView(pane.view);
+        this.adjustPanes();
     }
 
     private sendPaneIds() {
@@ -102,8 +127,7 @@ export class PaneHost {
         this.window.webContents.ipc.on(channel, callback);
     }
 
-    adjustPanes() {
-        const views = this.window.getBrowserViews();
+    private adjustPanes() {
         const size = this.window.getContentSize();
 
         const contentWidth = this.contentSize?.width ?? size[0];
@@ -111,14 +135,15 @@ export class PaneHost {
 
         const width = 320;
 
-        for (let i = 0; i < views.length; i++) {
+        for (let i = 0; i < this.panes.length; i++) {
+            const view = this.panes[i].view;
             const left = Math.round(i * width + this.contentOffset.x);
             const right = Math.round((i + 1) * width + this.contentOffset.x);
             const top = Math.round(this.contentOffset.y);
             const bottom = Math.round(contentHeight + this.contentOffset.y);
 
-            const bounds = { x: left, y: top, width: right - left, height: bottom - top };
-            views[i].setBounds(bounds);
+            const bounds = { x: left + 1, y: top, width: right - left - 1, height: bottom - top };
+            view.setBounds(bounds);
         }
     }
 }

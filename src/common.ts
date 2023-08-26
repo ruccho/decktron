@@ -1,14 +1,13 @@
 export type PaneData = {
     id: string;
     session: SessionData;
-    canGoBack: boolean;
-    canGoForward: boolean;
+    viewEnabled: boolean;
+    themeColor?: string;
 };
 
 export type SessionData = {
     id: string;
     user?: UserData;
-    themeColor?: string;
 }
 
 export type UserData = {

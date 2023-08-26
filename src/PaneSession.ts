@@ -6,6 +6,8 @@ export class PaneSession {
     public readonly electronSession: Session;
     public readonly data: SessionData;
 
+    private readonly onUpdatedCallbacks: ((session: PaneSession) => void)[] = [];
+
     constructor(id: string) {
         this.id = id;
         this.electronSession = session.fromPartition(`persist:decktron/pane-${id}`);
@@ -30,5 +32,21 @@ export class PaneSession {
                 }
             })
         });
+    }
+
+    onUpdated(callback: (session: PaneSession) => void)
+    {
+        this.onUpdatedCallbacks.push(callback);
+    }
+
+    offUpdated(callback: (session: PaneSession) => void)
+    {
+        const index = this.onUpdatedCallbacks.indexOf(callback);
+        if(index >= 0) this.onUpdatedCallbacks.splice(index, 1);
+    }
+
+    setDirty()
+    {
+        this.onUpdatedCallbacks.forEach(c => c(this));
     }
 }

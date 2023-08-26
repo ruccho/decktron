@@ -12,10 +12,22 @@ if (location.host === "twitter.com") {
 }
 
 function preload() {
+
+    ipcRenderer.on("navigate", (event, value) => {
+        console.log(value);
+        if (typeof value !== "string") return;
+
+        const navItem = document.querySelector<HTMLAnchorElement>(`nav > a[href='${value}']`);
+        if (navItem) navItem.click();
+        else location.href = value;
+    });
+
     document.addEventListener("DOMContentLoaded", () => {
 
         ipcRenderer.send("background-color", document.body.style.backgroundColor);
-        ipcRenderer.on("x-fetchInitialOrTop", fetchInitialOrTop);
+        ipcRenderer.on("refresh", () => {
+            location.reload();
+        });
         waitForElement(document.body, "header", true, (header) => {
             (header as HTMLElement).style.display = "none";
         });
@@ -44,10 +56,21 @@ function preload() {
         });
         */
 
-        const themeColor = document.querySelector("meta[name='theme-color']")?.getAttribute("content");
+        const themeColorMeta = document.querySelector("meta[name='theme-color']");
 
-        if (themeColor) {
-            ipcRenderer.send("theme-color", themeColor);
+        if (themeColorMeta) {
+            const observer: MutationObserver = new MutationObserver(records => {
+                const value = themeColorMeta.getAttribute("content");
+                document.body.style.setProperty("--decktron-pane-background", value)
+                ipcRenderer.send("theme-color", value);
+            })
+
+            observer.observe(themeColorMeta, {
+                attributes: true,
+                attributeFilter: [
+                    "content"
+                ]
+            });
         }
 
 
@@ -87,26 +110,35 @@ function waitForElement(container: Element, selector: string, subtree: boolean, 
     });
 }
 
+
+function getFiber(selector: string): Fiber | undefined {
+    const timeline = document.querySelector(selector);
+    if (!timeline) return;
+
+    for (const [key, value] of Object.entries(timeline)) {
+        if (key.startsWith("__reactFiber$")) {
+            return value;
+        }
+    }
+}
+
+function getAncestor(fiber: Fiber, hops: number) {
+    let fiberCursor: Fiber | null = fiber;
+    for (let i = 0; i < hops && fiberCursor; i++) fiberCursor = fiberCursor.return;
+    return fiberCursor ?? undefined;
+}
+
 function fetchInitialOrTop() {
-    const timeline = document.querySelector("section.css-1dbjc4n");
+    const timelineFiber = getFiber("section.css-1dbjc4n");
+    if (!timelineFiber) return;
 
-    if(!timeline) return;
-
-    const key = Object.keys(timeline as any).find(value => value.startsWith("__reactFiber$"));
-
-    if (!key) return;
-    const timelineFiber: Fiber = (timeline as any)[key];
-    let fiber: Fiber | null = timelineFiber;
-    for (let i = 0; i < 29 && fiber; i++) fiber = fiber.return;
-    if (!fiber) return;
-
-    const stateNode = fiber.stateNode;
+    const stateNode = getAncestor(timelineFiber, 29)?.stateNode;
 
     console.log("fetchTop");
     stateNode?._timelineAPI?.fetchTop();
 }
 
 setInterval(() => {
-    if(location.pathname !== "/home") return;
+    if (location.pathname !== "/home") return;
     fetchInitialOrTop();
 }, 10_000);

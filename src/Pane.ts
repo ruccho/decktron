@@ -11,14 +11,18 @@ declare const PANE_VIEW_PRELOAD_WEBPACK_ENTRY: string;
 
 export class Pane {
 
-    private id: string;
+    private readonly id: string;
     public readonly view: BrowserView;
     public readonly data: PaneData;
-    private host: PaneHostBase;
+    private readonly host: PaneHostBase;
+    private readonly session: PaneSession;
+
+    private readonly onSessionUpdatedLambda: (session: PaneSession) => void;
 
     constructor(host: PaneHostBase, session: PaneSession, initialUrl: string) {
         this.id = uuidv4();
         this.host = host;
+        this.session = session;
 
         this.view = new BrowserView({
             webPreferences: {
@@ -30,9 +34,8 @@ export class Pane {
 
         this.data = {
             id: this.id,
-            canGoBack: false,
-            canGoForward: false,
-            session: session.data
+            session: session.data,
+            viewEnabled: false
         };
 
         this.view.webContents.ipc.on("initial-state", (event, initialState?: XInitialState) => {
@@ -53,21 +56,52 @@ export class Pane {
             this.sendData();
         })
         this.view.webContents.ipc.on("theme-color", (event, themeColor: string) => {
-
+            this.data.themeColor = themeColor;
             this.sendData();
         })
         this.view.webContents.ipc.on("log", (event, value) => {
             console.log(value);
         });
-
         this.host.on(this.dataChannel, () => {
             this.host.send(this.dataChannel, this.data);
         });
         this.host.send(this.dataChannel, this.data);
-        
-        this.host.on(`pane-${this.id}-refresh`, () => {
-            this.fetchInitialOrTop();
+
+        const getChannel = (command: string) => `pane-${this.id}-${command}`;
+
+        this.host.on(getChannel("refresh"), () => {
+            this.refresh();
         });
+        this.host.on(getChannel("back"), () => {
+            this.back();
+        });
+        this.host.on(getChannel("forward"), () => {
+            this.forward();
+        });
+        this.host.on(getChannel("close"), () => {
+            this.close();
+        });
+        this.host.on(getChannel("view-enabled"), (event, value) => {
+            if (typeof value !== "boolean") return;
+            this.setViewEnabled(value);
+        });
+        this.host.on(getChannel("navigate"), (event, value) => {
+            if (typeof value !== "string") return;
+            this.view.webContents.send("navigate", value);
+            this.setViewEnabled(true);
+        });
+        /*
+        this.host.on(getChannel("left"), () => {
+        });
+        this.host.on(getChannel("right"), () => {
+        });
+        */
+
+
+        this.onSessionUpdatedLambda = () => {
+            this.onSessionUpdated();
+        };
+        session.onUpdated(this.onSessionUpdatedLambda);
 
         this.view.webContents.loadURL(initialUrl);
         this.view.webContents.setWindowOpenHandler(({ url }) => {
@@ -84,6 +118,8 @@ export class Pane {
                 cssOrigin: "user"
             })
         });
+
+        this.setViewEnabled(true);
     }
 
     private get dataChannel() {
@@ -95,11 +131,40 @@ export class Pane {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    public dispose(){
-
+    public dispose() {
+        this.setViewEnabled(false);
+        this.view.webContents.closeDevTools();
+        this.session.offUpdated(this.onSessionUpdatedLambda);
     }
 
-    public fetchInitialOrTop(){
-        this.view.webContents.send("x-fetchInitialOrTop");
+    public refresh() {
+        this.view.webContents.reload();
+    }
+
+    public back() {
+        this.view.webContents.goBack();
+    }
+
+    public forward() {
+        this.view.webContents.goForward();
+    }
+
+    public close() {
+        this.host.remove(this);
+    }
+
+    private onSessionUpdated() {
+        this.sendData();
+    }
+
+    private setViewEnabled(enabled: boolean) {
+        if (this.data.viewEnabled === enabled) return;
+        this.data.viewEnabled = enabled;
+        if (enabled) {
+            this.host.addBrowserView(this);
+        } else {
+            this.host.removeBrowserView(this);
+        }
+        this.sendData();
     }
 }
