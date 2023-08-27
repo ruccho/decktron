@@ -103,6 +103,30 @@ export class PaneHost {
         this.adjustPanes();
     }
 
+    public move(pane: Pane, index: number)
+    {
+        const currentIndex = this.panes.indexOf(pane);
+        if(currentIndex < 0) return;
+
+        this.panes.splice(currentIndex, 1);
+        this.panes.splice(index, 0, pane);
+        this.sendPaneIds();
+        this.adjustPanes();
+    }
+
+    public moveShift(pane: Pane, shift: number)
+    {
+        const currentIndex = this.panes.indexOf(pane);
+        if(currentIndex < 0) return;
+
+        const newIndex = Math.min(this.panes.length - 1, Math.max(0, currentIndex + shift));
+
+        this.panes.splice(currentIndex, 1);
+        this.panes.splice(newIndex, 0, pane);
+        this.sendPaneIds();
+        this.adjustPanes();
+    }
+
     public addBrowserView(pane: Pane)
     {
         this.window.addBrowserView(pane.view);

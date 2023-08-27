@@ -90,12 +90,12 @@ export class Pane {
             this.view.webContents.send("navigate", value);
             this.setViewEnabled(true);
         });
-        /*
         this.host.on(getChannel("left"), () => {
+            this.host.moveShift(this, -1);
         });
         this.host.on(getChannel("right"), () => {
+            this.host.moveShift(this, 1);
         });
-        */
 
 
         this.onSessionUpdatedLambda = () => {

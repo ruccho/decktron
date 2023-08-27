@@ -17,7 +17,7 @@ function preload() {
         console.log(value);
         if (typeof value !== "string") return;
 
-        const navItem = document.querySelector<HTMLAnchorElement>(`nav > a[href='${value}']`);
+        const navItem = document.querySelector<HTMLAnchorElement>(`header a[href='${value}']`);
         if (navItem) navItem.click();
         else location.href = value;
     });
@@ -31,6 +31,22 @@ function preload() {
         waitForElement(document.body, "header", true, (header) => {
             (header as HTMLElement).style.display = "none";
         });
+        /*
+        waitForElement(document.body, "#react-root > div > div > div.css-1dbjc4n.r-18u37iz.r-13qz1uu.r-417010 > main > div", true, (container) => {
+
+            const observer: MutationObserver = new MutationObserver(records => {
+                console.log(location.href);
+
+                ipcRenderer.send("log", location.href);
+                ipcRenderer.send("log", location.href);
+            })
+        
+            observer.observe(container, {
+                childList: true,
+                subtree: false
+            });
+        });
+        */
 
         /*
 

@@ -8,4 +8,6 @@ export type PaneHostBase = {
 
     addBrowserView: (pane: Pane) => void;
     removeBrowserView: (pane: Pane) => void;
+    move: (pane: Pane, index: number) =>  void;
+    moveShift: (pane: Pane, shift: number) => void;
 }

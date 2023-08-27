@@ -4,8 +4,8 @@ import { PaneData } from "../common";
 import { IpcRenderer, IpcRendererEvent } from "electron";
 import RoundedButton from "./RoundedButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAngleLeft, faAngleRight, faArrowsRotate, faHandPointLeft, faHandPointRight, faHouse, faMagnifyingGlass, faUserGroup, faXmark } from "@fortawesome/free-solid-svg-icons";
-import { faBell, faBookmark, faEnvelope, faRectangleList, faUser } from "@fortawesome/free-regular-svg-icons";
+import { faAngleLeft, faAngleRight, faArrowsRotate, faFeather, faFileLines, faGear, faHandPointLeft, faHandPointRight, faHouse, faMagnifyingGlass, faUserGroup, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faBell, faBookmark, faEnvelope, faPenToSquare, faRectangleList, faUser } from "@fortawesome/free-regular-svg-icons";
 
 // eslint-disable-next-line no-var
 declare var window: { ipcRenderer: IpcRenderer };
@@ -95,10 +95,10 @@ const Pane: React.FC<{
             </div>
             <div className="pane-content" ref={paneContentRef}>
                 <div className="pane-content-menu">
-                    <PaneContentMenuItem label="Home" onClick={() => {
-                        sendCommand("navigate", "/home");
+                    <PaneContentMenuItem label="Post" onClick={() => {
+                        sendCommand("navigate", `/compose/tweet`);
                     }}>
-                        <FontAwesomeIcon icon={faHouse} />
+                        <FontAwesomeIcon icon={faFeather} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Move Left" onClick={() => {
                         sendCommand("left");
@@ -109,6 +109,11 @@ const Pane: React.FC<{
                         sendCommand("right");
                     }}>
                         <FontAwesomeIcon icon={faHandPointRight} />
+                    </PaneContentMenuItem>
+                    <PaneContentMenuItem label="Home" onClick={() => {
+                        sendCommand("navigate", "/home");
+                    }}>
+                        <FontAwesomeIcon icon={faHouse} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Explore" onClick={() => {
                         sendCommand("navigate", "/explore");
@@ -147,6 +152,16 @@ const Pane: React.FC<{
                         sendCommand("navigate", `/${pane.session.user.screenName}`);
                     }}>
                         <FontAwesomeIcon icon={faUser} />
+                    </PaneContentMenuItem>
+                    <PaneContentMenuItem label="Settings" onClick={() => {
+                        sendCommand("navigate", `/settings`);
+                    }}>
+                        <FontAwesomeIcon icon={faGear} />
+                    </PaneContentMenuItem>
+                    <PaneContentMenuItem label="Drafts" onClick={() => {
+                        sendCommand("navigate", `/compose/tweet/unsent/drafts`);
+                    }}>
+                        <FontAwesomeIcon icon={faFileLines} />
                     </PaneContentMenuItem>
                 </div>
             </div>
