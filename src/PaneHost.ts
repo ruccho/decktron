@@ -17,6 +17,7 @@ const entryUrls: { [k: string]: string } = {
 }
 
 const numSessions = 2;
+const showDevTools = false;
 
 export class PaneHost {
 
@@ -44,10 +45,10 @@ export class PaneHost {
                 }
             }
 
-            /*
-            const firstPane = this.panes[0];
-            firstPane.view.webContents.openDevTools();
-            */
+            if (showDevTools) {
+                const firstPane = this.panes[0];
+                firstPane.view.webContents.openDevTools();
+            }
         })
 
 
@@ -91,10 +92,9 @@ export class PaneHost {
         this.sendPaneIds();
     }
 
-    public remove(pane: Pane)
-    {
+    public remove(pane: Pane) {
         const index = this.panes.indexOf(pane);
-        if(index < 0) return;
+        if (index < 0) return;
 
         pane.dispose();
         this.window.removeBrowserView(pane.view);
@@ -103,10 +103,9 @@ export class PaneHost {
         this.adjustPanes();
     }
 
-    public move(pane: Pane, index: number)
-    {
+    public move(pane: Pane, index: number) {
         const currentIndex = this.panes.indexOf(pane);
-        if(currentIndex < 0) return;
+        if (currentIndex < 0) return;
 
         this.panes.splice(currentIndex, 1);
         this.panes.splice(index, 0, pane);
@@ -114,10 +113,9 @@ export class PaneHost {
         this.adjustPanes();
     }
 
-    public moveShift(pane: Pane, shift: number)
-    {
+    public moveShift(pane: Pane, shift: number) {
         const currentIndex = this.panes.indexOf(pane);
-        if(currentIndex < 0) return;
+        if (currentIndex < 0) return;
 
         const newIndex = Math.min(this.panes.length - 1, Math.max(0, currentIndex + shift));
 
@@ -127,14 +125,12 @@ export class PaneHost {
         this.adjustPanes();
     }
 
-    public addBrowserView(pane: Pane)
-    {
+    public addBrowserView(pane: Pane) {
         this.window.addBrowserView(pane.view);
         this.adjustPanes();
     }
 
-    public removeBrowserView(pane: Pane)
-    {
+    public removeBrowserView(pane: Pane) {
         this.window.removeBrowserView(pane.view);
         this.adjustPanes();
     }

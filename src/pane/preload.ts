@@ -48,13 +48,10 @@ function preload() {
         });
         */
 
-        /*
-
-        const renderer = window.__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers.get(1);
         waitForElement(document.body, "section.css-1dbjc4n", true, (timeline) => {
 
             setTimeout(() => {
-                const fiber = renderer?.findFiberByHostInstance(timeline);
+                const fiber = getFiberFromElement(timeline);
 
                 const knownFibers: Set<Fiber> = new Set();
 
@@ -70,7 +67,6 @@ function preload() {
                 if (fiber) process(fiber, 0);
             }, 2000);
         });
-        */
 
         const themeColorMeta = document.querySelector("meta[name='theme-color']");
 
@@ -130,8 +126,11 @@ function waitForElement(container: Element, selector: string, subtree: boolean, 
 function getFiber(selector: string): Fiber | undefined {
     const timeline = document.querySelector(selector);
     if (!timeline) return;
+    return getFiberFromElement(timeline);
+}
 
-    for (const [key, value] of Object.entries(timeline)) {
+function getFiberFromElement(element: Element): Fiber | undefined {
+    for (const [key, value] of Object.entries(element)) {
         if (key.startsWith("__reactFiber$")) {
             return value;
         }
@@ -149,6 +148,8 @@ function fetchInitialOrTop() {
     if (!timelineFiber) return;
 
     const stateNode = getAncestor(timelineFiber, 29)?.stateNode;
+
+    if (!stateNode._timelineRenderer._isAtNewest()) return;
 
     console.log("fetchTop");
     stateNode?._timelineAPI?.fetchTop();
