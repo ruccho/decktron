@@ -17,7 +17,7 @@ export class PaneSession {
 
         this.electronSession.webRequest.onHeadersReceived((details, callback) => {
 
-            if (new URL(details.url).origin === "https://twitter.com" && details.responseHeaders) {
+            if (new URL(details.url).origin === "https://x.com" && details.responseHeaders) {
                 const existingCsp = details.responseHeaders["content-security-policy"];
 
                 if (existingCsp) {

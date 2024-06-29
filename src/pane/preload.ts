@@ -7,7 +7,7 @@ declare var window: Window & typeof globalThis & {
 };
 
 
-if (location.host === "twitter.com") {
+if (location.host === "x.com") {
     preload();
 }
 

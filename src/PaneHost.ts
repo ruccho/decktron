@@ -6,13 +6,13 @@ import { SessionManager } from "./SessionManager";
 declare const HOST_WEBPACK_ENTRY: string;
 
 const entryUrls: { [k: string]: string } = {
-    "home": "https://twitter.com/home",
-    "explore": "https://twitter.com/explore",
-    "notifications": "https://twitter.com/notifications",
-    "settings": "https://twitter.com/settings",
+    "home": "https://x.com/home",
+    "explore": "https://x.com/explore",
+    "notifications": "https://x.com/notifications",
+    "settings": "https://x.com/settings",
     /*
-    "messages": "https://twitter.com/messages",
-    "bookmarks": "https://twitter.com/i/bookmarks",
+    "messages": "https://x.com/messages",
+    "bookmarks": "https://x.com/i/bookmarks",
     */
 }
 
