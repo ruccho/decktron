@@ -48,7 +48,7 @@ function preload() {
         });
         */
 
-        waitForElement(document.body, "section.css-1dbjc4n", true, (timeline) => {
+        waitForElement(document.body, "section.css-175oi2r", true, (timeline) => {
 
             setTimeout(() => {
                 const fiber = getFiberFromElement(timeline);
@@ -144,7 +144,7 @@ function getAncestor(fiber: Fiber, hops: number) {
 }
 
 function fetchInitialOrTop() {
-    const timelineFiber = getFiber("section.css-1dbjc4n");
+    const timelineFiber = getFiber("section.css-175oi2r");
     if (!timelineFiber) return;
 
     const stateNode = getAncestor(timelineFiber, 29)?.stateNode;
