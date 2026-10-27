@@ -7,6 +7,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAngleLeft, faAngleRight, faArrowsRotate, faBars, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { usePaneSnapshot } from "./viewSuspension";
 import { getPaneTitle } from "./paneTitle";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const Pane: React.FC<{
     pane: PaneData,
@@ -20,6 +22,9 @@ const Pane: React.FC<{
         registerContent(pane.id, element);
     }, [pane.id, registerContent]);
 
+    // The header is the handle for reordering panes by dragging.
+    const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: pane.id });
+
     const sendCommand = useCallback((command: PaneCommand) => {
         window.decktron.send("pane-command", pane.id, command);
     }, [pane.id]);
@@ -32,8 +37,16 @@ const Pane: React.FC<{
     const user = session?.user;
 
     return (
-        <div className="pane" style={{ backgroundColor: pane.themeColor, width: pane.width }}>
-            <div className="pane-header">
+        <div
+            ref={setNodeRef}
+            className={`pane ${isDragging ? "dragging" : ""}`}
+            style={{
+                backgroundColor: pane.themeColor,
+                width: pane.width,
+                transform: CSS.Translate.toString(transform),
+                transition,
+            }}>
+            <div className="pane-header" ref={setActivatorNodeRef} {...attributes} {...listeners}>
                 <div className="pane-header-menu-button">
                     <RoundedButton onClick={openMenu} title="Menu">
                         <div className="pane-header-icon">

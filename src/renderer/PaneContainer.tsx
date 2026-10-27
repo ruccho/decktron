@@ -1,8 +1,12 @@
 import Pane from "./Pane";
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { useViewSuspension } from "./viewSuspension";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
-import { LayoutData } from "../shared/common";
+import { LayoutData, PaneData } from "../shared/common";
 import { Rect } from "../shared/api";
 
 const PaneContainer: React.FC<{
@@ -11,6 +15,33 @@ const PaneContainer: React.FC<{
 }> = ({ layout, onAddPane }) => {
 
     const paneContainer = useRef<HTMLDivElement>(null);
+
+    // Pane views cannot follow the dragged panes, so they are suspended while dragging.
+    const [dragging, setDragging] = useState(false);
+    useViewSuspension(dragging);
+
+    // The order after a drop is shown until the main process sends the updated layout.
+    const [pendingOrder, setPendingOrder] = useState<{ base: LayoutData, ids: string[] } | null>(null);
+    const panes = pendingOrder?.base === layout
+        ? pendingOrder.ids.map(id => layout.panes.find(p => p.id === id)).filter((p): p is PaneData => p !== undefined)
+        : layout.panes;
+
+    // A small distance is required to start dragging so that the buttons in the header can be clicked.
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+    const onDragEnd = (event: DragEndEvent) => {
+        setDragging(false);
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const ids = panes.map(p => p.id);
+        const oldIndex = ids.indexOf(String(active.id));
+        const newIndex = ids.indexOf(String(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        setPendingOrder({ base: layout, ids: arrayMove(ids, oldIndex, newIndex) });
+        window.decktron.send("pane-command", String(active.id), { type: "move-to", index: newIndex });
+    };
     const contentElements = useRef(new Map<string, HTMLDivElement>());
     const resizeObserver = useRef<ResizeObserver | null>(null);
     const frameRequest = useRef<number | null>(null);
@@ -67,7 +98,7 @@ const PaneContainer: React.FC<{
     // Positions change when panes are added, removed, reordered or resized.
     useLayoutEffect(() => {
         reportBounds();
-    }, [layout, reportBounds]);
+    }, [panes, reportBounds]);
 
     // Scrolls to panes added after the first layout so that the user can see them.
     const knownPaneIds = useRef<Set<string> | null>(null);
@@ -95,15 +126,25 @@ const PaneContainer: React.FC<{
 
     return (
         <div className="pane-container" ref={paneContainer}>
-            {
-                layout.panes.map(pane => (
-                    <Pane
-                        pane={pane}
-                        session={layout.sessions.find(s => s.id === pane.sessionId)}
-                        registerContent={registerContent}
-                        key={pane.id} />
-                ))
-            }
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToHorizontalAxis]}
+                onDragStart={() => setDragging(true)}
+                onDragEnd={onDragEnd}
+                onDragCancel={() => setDragging(false)}>
+                <SortableContext items={panes.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                    {
+                        panes.map(pane => (
+                            <Pane
+                                pane={pane}
+                                session={layout.sessions.find(s => s.id === pane.sessionId)}
+                                registerContent={registerContent}
+                                key={pane.id} />
+                        ))
+                    }
+                </SortableContext>
+            </DndContext>
             {layout.panes.length === 0 ? (
                 <div className="pane-container-empty">
                     <p>No panes.</p>

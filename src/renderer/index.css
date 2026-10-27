@@ -55,7 +55,14 @@ body {
   background-color: #15202B;
 }
 
+.pane.dragging{
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.8);
+}
+
 .pane-header{
+  cursor: grab;
   height: 50px;
   flex-shrink: 0;
   padding: 0 5px;

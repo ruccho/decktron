@@ -35,6 +35,9 @@ function parsePaneCommand(value: unknown): PaneCommand | undefined {
         case "move":
             if (!isFiniteNumber(value.shift)) return;
             return { type: value.type, shift: value.shift };
+        case "move-to":
+            if (!Number.isInteger(value.index)) return;
+            return { type: value.type, index: value.index as number };
         case "open-menu":
             if (!isFiniteNumber(value.x) || !isFiniteNumber(value.y)) return;
             return { type: value.type, x: value.x, y: value.y };
@@ -202,6 +205,9 @@ export class PaneHost {
             case "move":
                 this.moveShift(pane, command.shift);
                 break;
+            case "move-to":
+                this.moveTo(pane, command.index);
+                break;
             case "open-menu":
                 this.openPaneMenu(pane, command.x, command.y);
                 break;
@@ -228,9 +234,19 @@ export class PaneHost {
     public moveShift(pane: Pane, shift: number) {
         const currentIndex = this.panes.indexOf(pane);
         if (currentIndex < 0) return;
+        this.moveTo(pane, currentIndex + shift);
+    }
 
-        const newIndex = Math.min(this.panes.length - 1, Math.max(0, currentIndex + shift));
-        if (newIndex === currentIndex) return;
+    public moveTo(pane: Pane, index: number) {
+        const currentIndex = this.panes.indexOf(pane);
+        if (currentIndex < 0) return;
+
+        const newIndex = Math.min(this.panes.length - 1, Math.max(0, index));
+        if (newIndex === currentIndex) {
+            // The renderer may have already reordered the panes, so send the actual order back.
+            this.sendLayout();
+            return;
+        }
 
         this.panes.splice(currentIndex, 1);
         this.panes.splice(newIndex, 0, pane);
