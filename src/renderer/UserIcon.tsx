@@ -6,7 +6,7 @@ const UserIcon: React.FC<{
 
     return (
         <div className="user-icon" style={{
-            backgroundImage: `url(${user?.profileImageUrl})`,
+            backgroundImage: user ? `url(${user.profileImageUrl})` : undefined,
         }}>
 
         </div>

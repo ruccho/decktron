@@ -1,11 +1,14 @@
 import Pane from "./Pane";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { LayoutData } from "../shared/common";
 import { Rect } from "../shared/api";
 
 const PaneContainer: React.FC<{
     layout: LayoutData,
-}> = ({ layout }) => {
+    onAddPane: () => void,
+}> = ({ layout, onAddPane }) => {
 
     const paneContainer = useRef<HTMLDivElement>(null);
     const contentElements = useRef(new Map<string, HTMLDivElement>());
@@ -66,6 +69,19 @@ const PaneContainer: React.FC<{
         reportBounds();
     }, [layout, reportBounds]);
 
+    // Scrolls to panes added after the first layout so that the user can see them.
+    const knownPaneIds = useRef<Set<string> | null>(null);
+    useLayoutEffect(() => {
+        const ids = new Set(layout.panes.map(p => p.id));
+        const known = knownPaneIds.current;
+        if (known && layout.panes.length > 0) {
+            const added = layout.panes.find(p => !known.has(p.id));
+            if (added) contentElements.current.get(added.id)?.parentElement?.scrollIntoView({ behavior: "smooth", inline: "nearest" });
+        }
+        // Ignore the initial empty layout that is shown before the first message arrives.
+        if (known || layout.panes.length > 0 || layout.sessions.length > 0) knownPaneIds.current = ids;
+    }, [layout]);
+
     const registerContent = useCallback((id: string, element: HTMLDivElement | null) => {
         const previous = contentElements.current.get(id);
         if (previous) resizeObserver.current?.unobserve(previous);
@@ -88,6 +104,16 @@ const PaneContainer: React.FC<{
                         key={pane.id} />
                 ))
             }
+            {layout.panes.length === 0 ? (
+                <div className="pane-container-empty">
+                    <p>No panes.</p>
+                    <button className="dialog-button primary" onClick={onAddPane}>Add Pane</button>
+                </div>
+            ) : (
+                <button className="pane-add-column" onClick={onAddPane} title="Add pane">
+                    <FontAwesomeIcon icon={faPlus} />
+                </button>
+            )}
         </div>
     )
 };

@@ -1,8 +1,9 @@
-import { BrowserWindow, Menu, MenuItemConstructorOptions, shell } from "electron";
+import { BrowserWindow, dialog, Menu, MenuItemConstructorOptions, shell } from "electron";
+import { randomUUID } from "node:crypto";
 import { Pane } from "./Pane";
 import { PaneSession } from "./PaneSession";
 import { SessionManager } from "./SessionManager";
-import { LayoutStore } from "./LayoutStore";
+import { createPaneConfig, LayoutStore } from "./LayoutStore";
 import { HostToMainChannels, MainToHostChannels, PaneCommand, Rect } from "../shared/api";
 import { LayoutData, PaneConfig, paneZoomPresets, UserData } from "../shared/common";
 import { clampPaneZoom, isFiniteNumber, isRecord } from "./validation";
@@ -42,6 +43,14 @@ function parsePaneCommand(value: unknown): PaneCommand | undefined {
 
 // Transient pages such as the compose dialog or the login flow are not restored on the next launch.
 const nonRestorablePathPrefixes = ["/compose/", "/i/flow/", "/i/jf/", "/login", "/logout"];
+
+function isValidPaneUrl(url: string) {
+    try {
+        return new URL(url).protocol === "https:";
+    } catch {
+        return false;
+    }
+}
 
 function isRestorableUrl(url: string) {
     try {
@@ -115,6 +124,67 @@ export class PaneHost {
             if (typeof value !== "boolean") return;
             this.setViewsSuspended(value);
         });
+
+        this.on("add-pane", (sessionId, url) => {
+            if (typeof sessionId !== "string" || typeof url !== "string") return;
+            if (!this.store.get().sessions.some(s => s.id === sessionId) || !isValidPaneUrl(url)) return;
+            this.add(createPaneConfig(sessionId, url));
+        });
+
+        this.on("add-account", () => {
+            const sessionId = randomUUID();
+            this.store.update(state => ({ ...state, sessions: [...state.sessions, { id: sessionId }] }));
+            this.add(createPaneConfig(sessionId, "https://x.com/home"));
+        });
+
+        this.on("open-session-menu", (sessionId, x, y) => {
+            if (typeof sessionId !== "string" || !isFiniteNumber(x) || !isFiniteNumber(y)) return;
+            if (!this.store.get().sessions.some(s => s.id === sessionId)) return;
+            this.openSessionMenu(sessionId, x, y);
+        });
+    }
+
+    private add(config: PaneConfig) {
+        this.store.update(state => ({ ...state, panes: [...state.panes, config] }));
+        this.createPane(config);
+        this.sendLayout();
+    }
+
+    private openSessionMenu(sessionId: string, x: number, y: number) {
+        const user = this.store.get().sessions.find(s => s.id === sessionId)?.user;
+        const template: MenuItemConstructorOptions[] = [
+            { label: user ? `@${user.screenName}` : "Not logged in", enabled: false },
+            { type: "separator" },
+            { label: "Add Pane...", click: () => this.send("open-add-pane-dialog", sessionId) },
+            { label: "Remove Account...", click: () => this.confirmRemoveSession(sessionId) },
+        ];
+        Menu.buildFromTemplate(template).popup({ window: this.window, x: Math.round(x), y: Math.round(y) });
+    }
+
+    private async confirmRemoveSession(sessionId: string) {
+        const user = this.store.get().sessions.find(s => s.id === sessionId)?.user;
+        const name = user ? `@${user.screenName}` : "this account";
+        const { response } = await dialog.showMessageBox(this.window, {
+            type: "warning",
+            message: `Remove ${name}?`,
+            detail: "All panes of the account are closed, and its login and browsing data are deleted.",
+            buttons: ["Remove", "Cancel"],
+            defaultId: 1,
+            cancelId: 1,
+            noLink: true,
+        });
+        if (response !== 0) return;
+
+        for (const pane of this.panes.filter(p => p.session.id === sessionId)) {
+            this.remove(pane);
+        }
+        this.store.update(state => ({ ...state, sessions: state.sessions.filter(s => s.id !== sessionId) }));
+        this.sendLayout();
+        try {
+            await this.sessions.clear(sessionId);
+        } catch (e) {
+            console.error(`Failed to clear the data of session ${sessionId}`, e);
+        }
     }
 
     private createPane(config: PaneConfig, index = this.panes.length) {

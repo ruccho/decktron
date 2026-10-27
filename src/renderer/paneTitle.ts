@@ -31,6 +31,7 @@ export function getPaneTitle(url: string): string {
     if (path.startsWith("/messages/")) return "Messages";
     if (path.startsWith("/i/lists/")) return "List";
     if (path.startsWith("/i/communities/")) return "Community";
+    if (path.startsWith("/i/flow/login") || path.startsWith("/i/jf/onboarding")) return "Log in";
 
     const segments = path.split("/").filter(s => s.length > 0);
     if (segments.length === 0) return "X";
