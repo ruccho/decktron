@@ -1,18 +1,18 @@
 import Pane from "./Pane";
 import { useEffect, useRef, useState } from "react";
+import { PaneData } from "../shared/common";
 
 const PaneContainer: React.FC = () => {
 
     const paneContainer = useRef<HTMLDivElement>(null);
 
-    const [paneIds, setPaneIds] = useState<string[]>([]);
+    const [panes, setPanes] = useState<PaneData[]>([]);
 
     useEffect(() => {
-        const channel = "pane-ids";
-        const unsubscribe = window.decktron.on(channel, (ids: string[]) => {
-            setPaneIds(ids);
+        const unsubscribe = window.decktron.on("panes", (panes) => {
+            setPanes(panes);
         });
-        window.decktron.send(channel);
+        window.decktron.send("request-panes");
 
         return unsubscribe;
     }, [])
@@ -37,7 +37,7 @@ const PaneContainer: React.FC = () => {
         paneContainerCurrent.addEventListener("scroll", onScroll);
 
         // Horizontal wheel input forwarded from panes, in physical pixels.
-        const unsubscribeWheel = window.decktron.on("wheel-horizontal", (delta: number) => {
+        const unsubscribeWheel = window.decktron.on("wheel-horizontal", (delta) => {
             paneContainerCurrent.scrollBy({ left: delta / window.devicePixelRatio, behavior: "instant" });
         });
 
@@ -54,8 +54,8 @@ const PaneContainer: React.FC = () => {
     return (
         <div className="pane-container" ref={paneContainer}>
             {
-                paneIds.map(id => (
-                    <Pane paneId={id} key={id} />
+                panes.map(pane => (
+                    <Pane pane={pane} key={pane.id} />
                 ))
             }
         </div>

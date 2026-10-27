@@ -1,23 +1,21 @@
 import { shell, WebContentsView } from "electron";
-import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { PaneSession } from "./PaneSession";
-import { PaneData, XInitialState } from "../shared/common";
+import { PaneConfig, PaneData, XInitialState } from "../shared/common";
+import { PaneCommand } from "../shared/api";
 import { PaneHostBase } from "./types";
 import paneCss from "./pane.css?raw";
 
 export class Pane {
 
-    private readonly id: string;
+    public readonly id: string;
     public readonly view: WebContentsView;
     public readonly data: PaneData;
     private readonly host: PaneHostBase;
-    private readonly session: PaneSession;
+    public readonly session: PaneSession;
 
-    private readonly onSessionUpdatedLambda: (session: PaneSession) => void;
-
-    constructor(host: PaneHostBase, session: PaneSession, initialUrl: string) {
-        this.id = randomUUID();
+    constructor(host: PaneHostBase, session: PaneSession, config: PaneConfig) {
+        this.id = config.id;
         this.host = host;
         this.session = session;
 
@@ -50,61 +48,21 @@ export class Pane {
                 profileImageUrl: user.profile_image_url_https,
                 screenName: user.screen_name
             }
-            this.sendData();
+            this.host.onPaneDataChanged(this);
         })
         this.view.webContents.ipc.on("theme-color", (event, themeColor: string) => {
             this.data.themeColor = themeColor;
-            this.sendData();
+            this.host.onPaneDataChanged(this);
         })
         this.view.webContents.ipc.on("log", (event, value) => {
             console.log(value);
         });
         this.view.webContents.ipc.on("wheel-horizontal", (event, delta) => {
             if (typeof delta !== "number" || !Number.isFinite(delta)) return;
-            this.host.send("wheel-horizontal", delta);
-        });
-        this.host.on(this.dataChannel, () => {
-            this.host.send(this.dataChannel, this.data);
-        });
-        this.host.send(this.dataChannel, this.data);
-
-        const getChannel = (command: string) => `pane-${this.id}-${command}`;
-
-        this.host.on(getChannel("refresh"), () => {
-            this.refresh();
-        });
-        this.host.on(getChannel("back"), () => {
-            this.back();
-        });
-        this.host.on(getChannel("forward"), () => {
-            this.forward();
-        });
-        this.host.on(getChannel("close"), () => {
-            this.close();
-        });
-        this.host.on(getChannel("view-enabled"), (event, value) => {
-            if (typeof value !== "boolean") return;
-            this.setViewEnabled(value);
-        });
-        this.host.on(getChannel("navigate"), (event, value) => {
-            if (typeof value !== "string") return;
-            this.view.webContents.send("navigate", value);
-            this.setViewEnabled(true);
-        });
-        this.host.on(getChannel("left"), () => {
-            this.host.moveShift(this, -1);
-        });
-        this.host.on(getChannel("right"), () => {
-            this.host.moveShift(this, 1);
+            this.host.onPaneWheelHorizontal(delta);
         });
 
-
-        this.onSessionUpdatedLambda = () => {
-            this.onSessionUpdated();
-        };
-        session.onUpdated(this.onSessionUpdatedLambda);
-
-        this.view.webContents.loadURL(initialUrl);
+        this.view.webContents.loadURL(config.url);
         this.view.webContents.setWindowOpenHandler(({ url }) => {
             const urlObj = new URL(url);
             const protocol = urlObj.protocol;
@@ -119,43 +77,42 @@ export class Pane {
                 cssOrigin: "user"
             })
         });
+        this.view.webContents.on("did-navigate", (event, url) => {
+            this.host.onPaneNavigated(this, url);
+        });
+        this.view.webContents.on("did-navigate-in-page", (event, url, isMainFrame) => {
+            if (isMainFrame) this.host.onPaneNavigated(this, url);
+        });
 
         this.setViewEnabled(true);
-    }
-
-    private get dataChannel() {
-        return `pane-data-${this.id}`;
-    }
-
-    private sendData() {
-        this.host.send(this.dataChannel, this.data);
     }
 
     public dispose() {
         this.setViewEnabled(false);
         this.view.webContents.closeDevTools();
         this.view.webContents.close();
-        this.session.offUpdated(this.onSessionUpdatedLambda);
     }
 
-    public refresh() {
-        this.view.webContents.reload();
-    }
-
-    public back() {
-        this.view.webContents.goBack();
-    }
-
-    public forward() {
-        this.view.webContents.goForward();
-    }
-
-    public close() {
-        this.host.remove(this);
-    }
-
-    private onSessionUpdated() {
-        this.sendData();
+    // Handles commands that only affect this pane. Commands that affect the layout are handled by the host.
+    public handleCommand(command: PaneCommand) {
+        switch (command.type) {
+            case "refresh":
+                this.view.webContents.reload();
+                break;
+            case "back":
+                this.view.webContents.navigationHistory.goBack();
+                break;
+            case "forward":
+                this.view.webContents.navigationHistory.goForward();
+                break;
+            case "set-view-enabled":
+                this.setViewEnabled(command.enabled);
+                break;
+            case "navigate":
+                this.view.webContents.send("navigate", command.path);
+                this.setViewEnabled(true);
+                break;
+        }
     }
 
     private setViewEnabled(enabled: boolean) {
@@ -166,6 +123,6 @@ export class Pane {
         } else {
             this.host.removeView(this);
         }
-        this.sendData();
+        this.host.onPaneDataChanged(this);
     }
 }

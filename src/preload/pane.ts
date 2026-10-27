@@ -66,7 +66,6 @@ function canScrollHorizontally(target: EventTarget | null, delta: number) {
 function preload() {
 
     ipcRenderer.on("navigate", (event, value) => {
-        console.log(value);
         if (typeof value !== "string") return;
 
         const navItem = document.querySelector<HTMLAnchorElement>(`header a[href='${value}']`);
@@ -76,48 +75,8 @@ function preload() {
 
     document.addEventListener("DOMContentLoaded", () => {
 
-        ipcRenderer.send("background-color", document.body.style.backgroundColor);
-        ipcRenderer.on("refresh", () => {
-            location.reload();
-        });
         waitForElement(document.body, "header", true, (header) => {
             (header as HTMLElement).style.display = "none";
-        });
-        /*
-        waitForElement(document.body, "#react-root > div > div > div.css-1dbjc4n.r-18u37iz.r-13qz1uu.r-417010 > main > div", true, (container) => {
-
-            const observer: MutationObserver = new MutationObserver(records => {
-                console.log(location.href);
-
-                ipcRenderer.send("log", location.href);
-                ipcRenderer.send("log", location.href);
-            })
-        
-            observer.observe(container, {
-                childList: true,
-                subtree: false
-            });
-        });
-        */
-
-        waitForElement(document.body, "section.css-175oi2r", true, (timeline) => {
-
-            setTimeout(() => {
-                const fiber = getFiberFromElement(timeline);
-
-                const knownFibers: Set<Fiber> = new Set();
-
-                const process = (f: Fiber | null, i: number) => {
-                    if (!f || knownFibers.has(f)) return;
-                    knownFibers.add(f);
-
-                    console.log(f.stateNode, i);
-
-                    process(f.return, i + 1);
-                }
-
-                if (fiber) process(fiber, 0);
-            }, 2000);
         });
 
         const themeColorMeta = document.querySelector("meta[name='theme-color']");
@@ -203,7 +162,6 @@ function fetchInitialOrTop() {
 
     if (!stateNode._timelineRenderer._isAtNewest()) return;
 
-    console.log("fetchTop");
     stateNode?._timelineAPI?.fetchTop();
 }
 

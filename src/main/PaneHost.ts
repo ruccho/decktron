@@ -1,88 +1,130 @@
-import { BrowserWindow, IpcMainEvent } from "electron";
+import { BrowserWindow } from "electron";
 import { Pane } from "./Pane";
-import { PaneSession } from "./PaneSession";
 import { SessionManager } from "./SessionManager";
+import { LayoutStore } from "./LayoutStore";
+import { HostToMainChannels, MainToHostChannels, PaneCommand, Point, Size } from "../shared/api";
+import { PaneConfig } from "../shared/common";
 
-const entryUrls: { [k: string]: string } = {
-    "home": "https://x.com/home",
-    "explore": "https://x.com/explore",
-    "notifications": "https://x.com/notifications",
-    "settings": "https://x.com/settings",
-    /*
-    "messages": "https://x.com/messages",
-    "bookmarks": "https://x.com/i/bookmarks",
-    */
+const showDevTools = false;
+
+// Replaces each argument type with unknown, keeping the number of arguments.
+type Unvalidated<T extends unknown[]> = { [I in keyof T]: unknown };
+
+function isFiniteNumber(value: unknown): value is number {
+    return typeof value === "number" && Number.isFinite(value);
 }
 
-const numSessions = 2;
-const showDevTools = false;
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+function parseSize(value: unknown): Size | undefined {
+    if (!isRecord(value) || !isFiniteNumber(value.width) || !isFiniteNumber(value.height)) return;
+    return { width: value.width, height: value.height };
+}
+
+function parsePoint(value: unknown): Point | undefined {
+    if (!isRecord(value) || !isFiniteNumber(value.x) || !isFiniteNumber(value.y)) return;
+    return { x: value.x, y: value.y };
+}
+
+function parsePaneCommand(value: unknown): PaneCommand | undefined {
+    if (!isRecord(value)) return;
+    switch (value.type) {
+        case "refresh":
+        case "back":
+        case "forward":
+        case "close":
+            return { type: value.type };
+        case "set-view-enabled":
+            if (typeof value.enabled !== "boolean") return;
+            return { type: value.type, enabled: value.enabled };
+        case "navigate":
+            if (typeof value.path !== "string") return;
+            return { type: value.type, path: value.path };
+        case "move":
+            if (!isFiniteNumber(value.shift)) return;
+            return { type: value.type, shift: value.shift };
+    }
+}
+
+// Transient pages such as the compose dialog or the login flow are not restored on the next launch.
+const nonRestorablePathPrefixes = ["/compose/", "/i/flow/", "/i/jf/", "/login", "/logout"];
+
+function isRestorableUrl(url: string) {
+    try {
+        const { protocol, pathname } = new URL(url);
+        if (protocol !== "https:") return false;
+        return !nonRestorablePathPrefixes.some(prefix => pathname.startsWith(prefix));
+    } catch {
+        return false;
+    }
+}
 
 export class PaneHost {
 
     private readonly window: BrowserWindow;
+    private readonly store: LayoutStore;
     private readonly panes: Pane[] = [];
     private readonly sessions: SessionManager = new SessionManager();
-    private contentSize: { width: number, height: number } | undefined = undefined;
-    private contentOffset: { x: number, y: number } = { x: 0, y: 0 };
+    private contentSize: Size | undefined = undefined;
+    private contentOffset: Point = { x: 0, y: 0 };
 
-    constructor(window: BrowserWindow) {
+    constructor(window: BrowserWindow, store: LayoutStore) {
 
         this.window = window;
+        this.store = store;
 
-        window.webContents.on("did-finish-load", () => {
+        for (const config of store.get().panes) {
+            this.panes.push(new Pane(this, this.sessions.get(config.sessionId), config));
+        }
 
-            this.clear();
-
-            for (const entryUrl of Object.values(entryUrls)) {
-                for (let s = 0; s < numSessions; s++) {
-                    this.add(this.sessions.get(s.toString()), entryUrl);
-                }
-            }
-
-            if (showDevTools) {
-                const firstPane = this.panes[0];
-                firstPane.view.webContents.openDevTools();
-            }
-        })
-
-
+        if (showDevTools && this.panes.length > 0) {
+            this.panes[0].view.webContents.openDevTools();
+        }
 
         window.webContents.ipc.on("log", (event, value) => {
             console.log(value);
         });
 
-        window.webContents.ipc.on("background-color", (event, value) => {
-            this.window.webContents.send("background-color", value);
+        this.on("request-panes", () => {
+            this.sendPanes();
         });
 
-        window.webContents.ipc.on("container-size", (event, value) => {
-            this.contentSize = value;
-            this.adjustPanes()
+        this.on("pane-command", (paneId, command) => {
+            const pane = this.panes.find(p => p.id === paneId);
+            const parsedCommand = parsePaneCommand(command);
+            if (!pane || !parsedCommand) return;
+            this.handlePaneCommand(pane, parsedCommand);
         });
 
-        window.webContents.ipc.on("container-offset", (event, value) => {
-            this.contentOffset = value;
-            this.adjustPanes()
+        this.on("container-size", (value) => {
+            const size = parseSize(value);
+            if (!size) return;
+            this.contentSize = size;
+            this.adjustPanes();
         });
 
-        window.webContents.ipc.on("pane-ids", () => {
-            this.sendPaneIds();
+        this.on("container-offset", (value) => {
+            const offset = parsePoint(value);
+            if (!offset) return;
+            this.contentOffset = offset;
+            this.adjustPanes();
         });
     }
 
-    private clear() {
-        for (const pane of this.panes) {
-            pane.dispose();
+    private handlePaneCommand(pane: Pane, command: PaneCommand) {
+        switch (command.type) {
+            case "close":
+                this.remove(pane);
+                break;
+            case "move":
+                this.moveShift(pane, command.shift);
+                break;
+            default:
+                pane.handleCommand(command);
+                break;
         }
-        this.panes.splice(0);
-    }
-
-    private add(session: PaneSession, initialUrl: string) {
-
-        const pane = new Pane(this, session, initialUrl);
-
-        this.panes.push(pane);
-        this.sendPaneIds();
     }
 
     public remove(pane: Pane) {
@@ -91,17 +133,11 @@ export class PaneHost {
 
         pane.dispose();
         this.panes.splice(index, 1);
-        this.sendPaneIds();
-        this.adjustPanes();
-    }
-
-    public move(pane: Pane, index: number) {
-        const currentIndex = this.panes.indexOf(pane);
-        if (currentIndex < 0) return;
-
-        this.panes.splice(currentIndex, 1);
-        this.panes.splice(index, 0, pane);
-        this.sendPaneIds();
+        this.store.update(state => ({
+            ...state,
+            panes: state.panes.filter(p => p.id !== pane.id),
+        }));
+        this.sendPanes();
         this.adjustPanes();
     }
 
@@ -110,10 +146,12 @@ export class PaneHost {
         if (currentIndex < 0) return;
 
         const newIndex = Math.min(this.panes.length - 1, Math.max(0, currentIndex + shift));
+        if (newIndex === currentIndex) return;
 
         this.panes.splice(currentIndex, 1);
         this.panes.splice(newIndex, 0, pane);
-        this.sendPaneIds();
+        this.savePaneOrder();
+        this.sendPanes();
         this.adjustPanes();
     }
 
@@ -127,16 +165,46 @@ export class PaneHost {
         this.adjustPanes();
     }
 
-    private sendPaneIds() {
-        this.send("pane-ids", this.panes.map(p => p.data.id));
+    public onPaneDataChanged() {
+        // Panes that share a session also share its data, so all panes are sent at once.
+        this.sendPanes();
     }
 
-    public send(channel: string, ...args: any[]) {
+    public onPaneNavigated(pane: Pane, url: string) {
+        if (!isRestorableUrl(url)) return;
+        this.store.update(state => ({
+            ...state,
+            panes: state.panes.map(p => p.id === pane.id ? { ...p, url } : p),
+        }));
+    }
+
+    public onPaneWheelHorizontal(delta: number) {
+        this.send("wheel-horizontal", delta);
+    }
+
+    private savePaneOrder() {
+        this.store.update(state => {
+            const configs = new Map(state.panes.map(p => [p.id, p]));
+            return {
+                ...state,
+                panes: this.panes.map(p => configs.get(p.id)).filter((p): p is PaneConfig => p !== undefined),
+            };
+        });
+    }
+
+    private sendPanes() {
+        this.send("panes", this.panes.map(p => p.data));
+    }
+
+    private send<K extends keyof MainToHostChannels>(channel: K, ...args: MainToHostChannels[K]) {
         this.window.webContents.send(channel, ...args);
     }
 
-    public on(channel: string, callback: (event: IpcMainEvent, ...args: any[]) => void) {
-        this.window.webContents.ipc.on(channel, callback);
+    // Arguments from the renderer are typed as unknown because they must be validated before use.
+    private on<K extends keyof HostToMainChannels>(channel: K, callback: (...args: Unvalidated<HostToMainChannels[K]>) => void) {
+        this.window.webContents.ipc.on(channel, (event, ...args) => {
+            (callback as (...args: unknown[]) => void)(...args);
+        });
     }
 
     private adjustPanes() {

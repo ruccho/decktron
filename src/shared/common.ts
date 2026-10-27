@@ -17,6 +17,32 @@ export type UserData = {
     profileImageUrl: string;
 }
 
+// Persistent state of the application, saved as JSON in the user data directory.
+export type LayoutState = {
+    version: 1;
+    sessions: SessionConfig[];
+    panes: PaneConfig[];
+    window?: WindowConfig;
+};
+
+export type SessionConfig = {
+    id: string;
+};
+
+export type PaneConfig = {
+    id: string;
+    sessionId: string;
+    url: string;
+};
+
+export type WindowConfig = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    maximized: boolean;
+};
+
 export type XInitialState = {
     entities: {
         users: {

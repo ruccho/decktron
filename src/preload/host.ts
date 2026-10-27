@@ -7,7 +7,7 @@ import type { DecktronApi } from "../shared/api";
 const api: DecktronApi = {
     send: (channel, ...args) => ipcRenderer.send(channel, ...args),
     on: (channel, listener) => {
-        const callback = (_event: IpcRendererEvent, ...args: any[]) => listener(...args);
+        const callback = (_event: IpcRendererEvent, ...args: unknown[]) => (listener as (...args: unknown[]) => void)(...args);
         ipcRenderer.on(channel, callback);
         return () => {
             ipcRenderer.off(channel, callback);

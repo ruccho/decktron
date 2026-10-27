@@ -1,6 +1,7 @@
-import React, { MouseEventHandler, ReactNode, useCallback, useEffect, useRef, useState } from "react"
+import React, { MouseEventHandler, ReactNode, useCallback, useRef } from "react"
 import UserIcon from "./UserIcon";
 import { PaneData } from "../shared/common";
+import { PaneCommand } from "../shared/api";
 import RoundedButton from "./RoundedButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAngleLeft, faAngleRight, faArrowsRotate, faFeather, faFileLines, faGear, faHandPointLeft, faHandPointRight, faHouse, faMagnifyingGlass, faUserGroup, faXmark } from "@fortawesome/free-solid-svg-icons";
@@ -22,63 +23,51 @@ const PaneContentMenuItem: React.FC<{
 };
 
 const Pane: React.FC<{
-    paneId: string
-}> = ({ paneId }) => {
+    pane: PaneData
+}> = ({ pane }) => {
     const paneContentRef = useRef(null);
-    const [pane, setPane] = useState<PaneData | null>(null);
 
-    useEffect(() => {
-        const channel = `pane-data-${paneId}`;
-        const unsubscribe = window.decktron.on(channel, (pane: PaneData) => {
-            setPane(pane);
-        });
-        window.decktron.send(channel);
-
-        return unsubscribe;
-    }, [paneId]);
-
-    const sendCommand = useCallback((command: string, ...args: any[]) => {
-        window.decktron.send(`pane-${paneId}-${command}`, ...args);
-    }, [paneId]);
+    const sendCommand = useCallback((command: PaneCommand) => {
+        window.decktron.send("pane-command", pane.id, command);
+    }, [pane.id]);
 
     return (
-        <div className="pane" style={{ backgroundColor: pane?.themeColor }}>
+        <div className="pane" style={{ backgroundColor: pane.themeColor }}>
             <div className="pane-header">
                 <div className="pane-header-menu-button">
                     <RoundedButton onClick={() => {
-                        if (!pane) return;
-                        window.decktron.send(`pane-${paneId}-view-enabled`, !pane.viewEnabled);
+                        sendCommand({ type: "set-view-enabled", enabled: !pane.viewEnabled });
                     }}>
                         <div className="pane-header-icon">
-                            <UserIcon user={pane?.session.user} />
+                            <UserIcon user={pane.session.user} />
                         </div>
                     </RoundedButton>
                 </div>
                 <div className="pane-header-control">
                     <div className="pane-header-menu-button">
                         <RoundedButton onClick={() => {
-                            sendCommand("back");
+                            sendCommand({ type: "back" });
                         }}>
                             <FontAwesomeIcon icon={faAngleLeft} />
                         </RoundedButton>
                     </div>
                     <div className="pane-header-menu-button">
                         <RoundedButton onClick={() => {
-                            sendCommand("forward");
+                            sendCommand({ type: "forward" });
                         }}>
                             <FontAwesomeIcon icon={faAngleRight} />
                         </RoundedButton>
                     </div>
                     <div className="pane-header-menu-button">
                         <RoundedButton onClick={() => {
-                            sendCommand("refresh");
+                            sendCommand({ type: "refresh" });
                         }}>
                             <FontAwesomeIcon icon={faArrowsRotate} />
                         </RoundedButton>
                     </div>
                     <div className="pane-header-menu-button pane-header-menu-button-right">
                         <RoundedButton onClick={() => {
-                            sendCommand("close");
+                            sendCommand({ type: "close" });
                         }}>
                             <FontAwesomeIcon icon={faXmark} />
                         </RoundedButton>
@@ -88,70 +77,70 @@ const Pane: React.FC<{
             <div className="pane-content" ref={paneContentRef}>
                 <div className="pane-content-menu">
                     <PaneContentMenuItem label="Post" onClick={() => {
-                        sendCommand("navigate", `/compose/tweet`);
+                        sendCommand({ type: "navigate", path: `/compose/tweet` });
                     }}>
                         <FontAwesomeIcon icon={faFeather} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Move Left" onClick={() => {
-                        sendCommand("left");
+                        sendCommand({ type: "move", shift: -1 });
                     }}>
                         <FontAwesomeIcon icon={faHandPointLeft} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Move Right" onClick={() => {
-                        sendCommand("right");
+                        sendCommand({ type: "move", shift: 1 });
                     }}>
                         <FontAwesomeIcon icon={faHandPointRight} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Home" onClick={() => {
-                        sendCommand("navigate", "/home");
+                        sendCommand({ type: "navigate", path: "/home" });
                     }}>
                         <FontAwesomeIcon icon={faHouse} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Explore" onClick={() => {
-                        sendCommand("navigate", "/explore");
+                        sendCommand({ type: "navigate", path: "/explore" });
                     }}>
                         <FontAwesomeIcon icon={faMagnifyingGlass} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Notifications" onClick={() => {
-                        sendCommand("navigate", "/notifications");
+                        sendCommand({ type: "navigate", path: "/notifications" });
                     }}>
                         <FontAwesomeIcon icon={faBell} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Messages" onClick={() => {
-                        sendCommand("navigate", "/messages");
+                        sendCommand({ type: "navigate", path: "/messages" });
                     }}>
                         <FontAwesomeIcon icon={faEnvelope} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Lists" onClick={() => {
-                        if(!pane?.session.user?.screenName) return;
-                        sendCommand("navigate", `/${pane.session.user.screenName}/lists`);
+                        if(!pane.session.user?.screenName) return;
+                        sendCommand({ type: "navigate", path: `/${pane.session.user.screenName}/lists` });
                     }}>
                         <FontAwesomeIcon icon={faRectangleList} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Bookmarks" onClick={() => {
-                        sendCommand("navigate", "/i/bookmarks");
+                        sendCommand({ type: "navigate", path: "/i/bookmarks" });
                     }}>
                         <FontAwesomeIcon icon={faBookmark} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Communities" onClick={() => {
-                        if(!pane?.session.user?.screenName) return;
-                        sendCommand("navigate", `/${pane.session.user.screenName}/communities`);
+                        if(!pane.session.user?.screenName) return;
+                        sendCommand({ type: "navigate", path: `/${pane.session.user.screenName}/communities` });
                     }}>
                         <FontAwesomeIcon icon={faUserGroup} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Profile" onClick={() => {
-                        if(!pane?.session.user?.screenName) return;
-                        sendCommand("navigate", `/${pane.session.user.screenName}`);
+                        if(!pane.session.user?.screenName) return;
+                        sendCommand({ type: "navigate", path: `/${pane.session.user.screenName}` });
                     }}>
                         <FontAwesomeIcon icon={faUser} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Settings" onClick={() => {
-                        sendCommand("navigate", `/settings`);
+                        sendCommand({ type: "navigate", path: `/settings` });
                     }}>
                         <FontAwesomeIcon icon={faGear} />
                     </PaneContentMenuItem>
                     <PaneContentMenuItem label="Drafts" onClick={() => {
-                        sendCommand("navigate", `/compose/tweet/unsent/drafts`);
+                        sendCommand({ type: "navigate", path: `/compose/tweet/unsent/drafts` });
                     }}>
                         <FontAwesomeIcon icon={faFileLines} />
                     </PaneContentMenuItem>
