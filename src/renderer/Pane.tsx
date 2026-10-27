@@ -1,14 +1,10 @@
 import React, { MouseEventHandler, ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import UserIcon from "./UserIcon";
-import { PaneData } from "../common";
-import { IpcRenderer, IpcRendererEvent } from "electron";
+import { PaneData } from "../shared/common";
 import RoundedButton from "./RoundedButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAngleLeft, faAngleRight, faArrowsRotate, faFeather, faFileLines, faGear, faHandPointLeft, faHandPointRight, faHouse, faMagnifyingGlass, faUserGroup, faXmark } from "@fortawesome/free-solid-svg-icons";
-import { faBell, faBookmark, faEnvelope, faPenToSquare, faRectangleList, faUser } from "@fortawesome/free-regular-svg-icons";
-
-// eslint-disable-next-line no-var
-declare var window: { ipcRenderer: IpcRenderer };
+import { faBell, faBookmark, faEnvelope, faRectangleList, faUser } from "@fortawesome/free-regular-svg-icons";
 
 const PaneContentMenuItem: React.FC<{
     children?: ReactNode,
@@ -33,21 +29,17 @@ const Pane: React.FC<{
 
     useEffect(() => {
         const channel = `pane-data-${paneId}`;
-        const callback: (event: IpcRendererEvent, ...args: any[]) => void = (event, pane) => {
+        const unsubscribe = window.decktron.on(channel, (pane: PaneData) => {
             setPane(pane);
-        };
+        });
+        window.decktron.send(channel);
 
-        window.ipcRenderer.on(channel, callback);
-        window.ipcRenderer.send(channel);
-
-        return () => {
-            window.ipcRenderer.off(channel, callback);
-        }
+        return unsubscribe;
     }, [paneId]);
 
     const sendCommand = useCallback((command: string, ...args: any[]) => {
-        window.ipcRenderer.send(`pane-${paneId}-${command}`, ...args);
-    }, [pane?.id]);
+        window.decktron.send(`pane-${paneId}-${command}`, ...args);
+    }, [paneId]);
 
     return (
         <div className="pane" style={{ backgroundColor: pane?.themeColor }}>
@@ -55,7 +47,7 @@ const Pane: React.FC<{
                 <div className="pane-header-menu-button">
                     <RoundedButton onClick={() => {
                         if (!pane) return;
-                        window.ipcRenderer.send(`pane-${paneId}-view-enabled`, !pane.viewEnabled);
+                        window.decktron.send(`pane-${paneId}-view-enabled`, !pane.viewEnabled);
                     }}>
                         <div className="pane-header-icon">
                             <UserIcon user={pane?.session.user} />

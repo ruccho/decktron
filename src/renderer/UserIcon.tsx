@@ -1,4 +1,4 @@
-import { UserData } from "../common";
+import { UserData } from "../shared/common";
 
 const UserIcon: React.FC<{
     user?: UserData,

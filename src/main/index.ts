@@ -1,11 +1,5 @@
-import { app, BrowserView, BrowserWindow, ipcMain, session, shell } from 'electron';
-import { PaneData, SessionData, XInitialState } from './common';
+import { app, BrowserWindow } from 'electron';
 import { Decktron } from './Decktron';
-
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-  app.quit();
-}
 
 function createWindow()
 {
@@ -16,7 +10,7 @@ function createWindow()
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => {
+app.whenReady().then(() => {
 
   createWindow()
 });
@@ -37,6 +31,3 @@ app.on('activate', () => {
     createWindow();
   }
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.

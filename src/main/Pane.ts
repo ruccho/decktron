@@ -1,18 +1,15 @@
-import { BrowserView, shell } from "electron";
+import { shell, WebContentsView } from "electron";
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import { PaneSession } from "./PaneSession";
-import { PaneData, XInitialState } from "./common";
+import { PaneData, XInitialState } from "../shared/common";
 import { PaneHostBase } from "./types";
-import { v4 as uuidv4 } from 'uuid';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const paneCss = require("./pane/index.css");
-
-declare const PANE_VIEW_WEBPACK_ENTRY: string;
-declare const PANE_VIEW_PRELOAD_WEBPACK_ENTRY: string;
+import paneCss from "./pane.css?raw";
 
 export class Pane {
 
     private readonly id: string;
-    public readonly view: BrowserView;
+    public readonly view: WebContentsView;
     public readonly data: PaneData;
     private readonly host: PaneHostBase;
     private readonly session: PaneSession;
@@ -20,13 +17,13 @@ export class Pane {
     private readonly onSessionUpdatedLambda: (session: PaneSession) => void;
 
     constructor(host: PaneHostBase, session: PaneSession, initialUrl: string) {
-        this.id = uuidv4();
+        this.id = randomUUID();
         this.host = host;
         this.session = session;
 
-        this.view = new BrowserView({
+        this.view = new WebContentsView({
             webPreferences: {
-                preload: PANE_VIEW_PRELOAD_WEBPACK_ENTRY,
+                preload: join(__dirname, "../preload/pane.js"),
                 session: session.electronSession,
                 contextIsolation: false
             }
@@ -61,6 +58,10 @@ export class Pane {
         })
         this.view.webContents.ipc.on("log", (event, value) => {
             console.log(value);
+        });
+        this.view.webContents.ipc.on("wheel-horizontal", (event, delta) => {
+            if (typeof delta !== "number" || !Number.isFinite(delta)) return;
+            this.host.send("wheel-horizontal", delta);
         });
         this.host.on(this.dataChannel, () => {
             this.host.send(this.dataChannel, this.data);
@@ -130,10 +131,10 @@ export class Pane {
         this.host.send(this.dataChannel, this.data);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
     public dispose() {
         this.setViewEnabled(false);
         this.view.webContents.closeDevTools();
+        this.view.webContents.close();
         this.session.offUpdated(this.onSessionUpdatedLambda);
     }
 
@@ -161,9 +162,9 @@ export class Pane {
         if (this.data.viewEnabled === enabled) return;
         this.data.viewEnabled = enabled;
         if (enabled) {
-            this.host.addBrowserView(this);
+            this.host.addView(this);
         } else {
-            this.host.removeBrowserView(this);
+            this.host.removeView(this);
         }
         this.sendData();
     }

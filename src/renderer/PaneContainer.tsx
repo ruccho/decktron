@@ -1,9 +1,5 @@
-import { IpcRenderer, IpcRendererEvent } from "electron";
 import Pane from "./Pane";
 import { useEffect, useRef, useState } from "react";
-
-// eslint-disable-next-line no-var
-declare var window: { ipcRenderer: IpcRenderer };
 
 const PaneContainer: React.FC = () => {
 
@@ -13,16 +9,12 @@ const PaneContainer: React.FC = () => {
 
     useEffect(() => {
         const channel = "pane-ids";
-        const callback: (event: IpcRendererEvent, ...args: any[]) => void = (event, ids) => {
-            console.log(ids);
+        const unsubscribe = window.decktron.on(channel, (ids: string[]) => {
             setPaneIds(ids);
-        };
-        window.ipcRenderer.on(channel, callback);
-        window.ipcRenderer.send(channel);
+        });
+        window.decktron.send(channel);
 
-        return () => {
-            window.ipcRenderer.off(channel, callback);
-        }
+        return unsubscribe;
     }, [])
 
     useEffect(() => {
@@ -34,24 +26,30 @@ const PaneContainer: React.FC = () => {
         const resizeObserver = new ResizeObserver(() => {
             const width = paneContainerCurrent.clientWidth;
             const height = paneContainerCurrent.clientHeight;
-            window.ipcRenderer.send("container-size", { width: width, height: height - 50 });
+            window.decktron.send("container-size", { width: width, height: height - 50 });
         });
         resizeObserver.observe(paneContainerCurrent);
 
         const onScroll = () => {
-            window.ipcRenderer.send("container-offset", { x: -paneContainerCurrent.scrollLeft, y: 50 - paneContainerCurrent.scrollTop });
+            window.decktron.send("container-offset", { x: -paneContainerCurrent.scrollLeft, y: 50 - paneContainerCurrent.scrollTop });
         };
 
         paneContainerCurrent.addEventListener("scroll", onScroll);
 
+        // Horizontal wheel input forwarded from panes, in physical pixels.
+        const unsubscribeWheel = window.decktron.on("wheel-horizontal", (delta: number) => {
+            paneContainerCurrent.scrollBy({ left: delta / window.devicePixelRatio, behavior: "instant" });
+        });
+
         return () => {
             resizeObserver.unobserve(paneContainerCurrent);
             paneContainerCurrent.removeEventListener("scroll", onScroll);
+            unsubscribeWheel();
         }
 
-    }, [paneContainer.current]);
+    }, []);
 
-    window.ipcRenderer.send("container-offset", { x: 0, y: 50 });
+    window.decktron.send("container-offset", { x: 0, y: 50 });
 
     return (
         <div className="pane-container" ref={paneContainer}>

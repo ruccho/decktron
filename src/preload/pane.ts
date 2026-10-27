@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import { Fiber, WorkTag } from 'react-reconciler';
+import { ipcRenderer } from 'electron';
+import type { Fiber } from 'react-reconciler';
 
 // eslint-disable-next-line no-var
 declare var window: Window & typeof globalThis & {
@@ -9,6 +9,58 @@ declare var window: Window & typeof globalThis & {
 
 if (location.host === "x.com") {
     preload();
+}
+
+forwardHorizontalWheel();
+
+// A WebContentsView does not chain scrolling to the host window, so horizontal wheel input
+// that the page itself cannot consume is forwarded to the host to scroll the pane container.
+function forwardHorizontalWheel() {
+    window.addEventListener("wheel", (event) => {
+        const delta = getHorizontalWheelDelta(event);
+        if (delta === 0) return;
+        if (canScrollHorizontally(event.target, delta)) return;
+
+        // Send the delta in physical pixels so that the host can convert it regardless of the pane's zoom factor.
+        ipcRenderer.send("wheel-horizontal", delta * window.devicePixelRatio);
+    }, { capture: true, passive: true });
+}
+
+function getHorizontalWheelDelta(event: WheelEvent) {
+    let delta: number;
+    if (event.shiftKey && event.deltaX === 0) {
+        // Shift + vertical wheel is treated as horizontal scrolling.
+        delta = event.deltaY;
+    } else if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        delta = event.deltaX;
+    } else {
+        return 0;
+    }
+
+    switch (event.deltaMode) {
+        case WheelEvent.DOM_DELTA_LINE:
+            return delta * 16;
+        case WheelEvent.DOM_DELTA_PAGE:
+            return delta * window.innerWidth;
+        default:
+            return delta;
+    }
+}
+
+function canScrollHorizontally(target: EventTarget | null, delta: number) {
+    for (let element = target instanceof Element ? target : null; element; element = element.parentElement) {
+        if (element.scrollWidth <= element.clientWidth) continue;
+
+        const overflowX = getComputedStyle(element).overflowX;
+        const scrollable = overflowX === "auto" || overflowX === "scroll" || element === document.scrollingElement;
+        if (!scrollable) continue;
+
+        const canScroll = delta < 0
+            ? element.scrollLeft > 0
+            : element.scrollLeft + element.clientWidth < element.scrollWidth - 1;
+        if (canScroll) return true;
+    }
+    return false;
 }
 
 function preload() {
@@ -61,7 +113,7 @@ function preload() {
 
                     console.log(f.stateNode, i);
 
-                    process(f.return, ++i);
+                    process(f.return, i + 1);
                 }
 
                 if (fiber) process(fiber, 0);
@@ -71,7 +123,7 @@ function preload() {
         const themeColorMeta = document.querySelector("meta[name='theme-color']");
 
         if (themeColorMeta) {
-            const observer: MutationObserver = new MutationObserver(records => {
+            const observer: MutationObserver = new MutationObserver(() => {
                 const value = themeColorMeta.getAttribute("content");
                 document.body.style.setProperty("--decktron-pane-background", value)
                 ipcRenderer.send("theme-color", value);
@@ -88,7 +140,7 @@ function preload() {
 
         document.querySelectorAll("script").forEach(element => {
             if (element.text.startsWith("window.__INITIAL_STATE__")) {
-                eval(element.text);
+                (0, eval)(element.text);
                 ipcRenderer.send("initial-state", window.__INITIAL_STATE__);
             }
 
@@ -108,7 +160,7 @@ function waitForElement(container: Element, selector: string, subtree: boolean, 
         }
     }
 
-    const observer: MutationObserver = new MutationObserver(records => {
+    const observer: MutationObserver = new MutationObserver(() => {
         const target = container.querySelector(selector);
         if (target) {
             observer.disconnect();

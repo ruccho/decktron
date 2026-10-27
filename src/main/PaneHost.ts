@@ -1,9 +1,7 @@
-import { BrowserWindow, IpcMainEvent, WebContents } from "electron";
+import { BrowserWindow, IpcMainEvent } from "electron";
 import { Pane } from "./Pane";
 import { PaneSession } from "./PaneSession";
 import { SessionManager } from "./SessionManager";
-
-declare const HOST_WEBPACK_ENTRY: string;
 
 const entryUrls: { [k: string]: string } = {
     "home": "https://x.com/home",
@@ -31,12 +29,8 @@ export class PaneHost {
 
         this.window = window;
 
-
-        window.webContents.loadURL(HOST_WEBPACK_ENTRY);
-
         window.webContents.on("did-finish-load", () => {
 
-            window.getBrowserViews().forEach(v => window.removeBrowserView(v));
             this.clear();
 
             for (const entryUrl of Object.values(entryUrls)) {
@@ -79,7 +73,6 @@ export class PaneHost {
     private clear() {
         for (const pane of this.panes) {
             pane.dispose();
-            this.window.removeBrowserView(pane.view);
         }
         this.panes.splice(0);
     }
@@ -97,7 +90,6 @@ export class PaneHost {
         if (index < 0) return;
 
         pane.dispose();
-        this.window.removeBrowserView(pane.view);
         this.panes.splice(index, 1);
         this.sendPaneIds();
         this.adjustPanes();
@@ -125,13 +117,13 @@ export class PaneHost {
         this.adjustPanes();
     }
 
-    public addBrowserView(pane: Pane) {
-        this.window.addBrowserView(pane.view);
+    public addView(pane: Pane) {
+        this.window.contentView.addChildView(pane.view);
         this.adjustPanes();
     }
 
-    public removeBrowserView(pane: Pane) {
-        this.window.removeBrowserView(pane.view);
+    public removeView(pane: Pane) {
+        this.window.contentView.removeChildView(pane.view);
         this.adjustPanes();
     }
 
@@ -150,7 +142,6 @@ export class PaneHost {
     private adjustPanes() {
         const size = this.window.getContentSize();
 
-        const contentWidth = this.contentSize?.width ?? size[0];
         const contentHeight = this.contentSize?.height ?? size[1];
 
         const width = 320;

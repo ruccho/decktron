@@ -1,5 +1,5 @@
 import { Session, session } from "electron";
-import { SessionData } from "./common";
+import { SessionData } from "../shared/common";
 
 export class PaneSession {
     public readonly id: string;

@@ -6,8 +6,8 @@ export type PaneHostBase = {
     on: (channel: string, callback: (event: IpcMainEvent, ...args: any[]) => void) => void;
     remove: (pane: Pane) => void;
 
-    addBrowserView: (pane: Pane) => void;
-    removeBrowserView: (pane: Pane) => void;
+    addView: (pane: Pane) => void;
+    removeView: (pane: Pane) => void;
     move: (pane: Pane, index: number) =>  void;
     moveShift: (pane: Pane, shift: number) => void;
 }
