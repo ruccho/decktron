@@ -8,6 +8,7 @@ export type PaneCommand =
     | { type: "navigate", path: string }
     | { type: "move", shift: number }
     | { type: "move-to", index: number }
+    | { type: "set-width", width: number }
     | { type: "scroll-to-top" }
     // Opens the pane menu at the given position in the host window's coordinates.
     | { type: "open-menu", x: number, y: number };

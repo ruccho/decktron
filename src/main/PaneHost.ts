@@ -6,7 +6,7 @@ import { SessionManager } from "./SessionManager";
 import { createPaneConfig, LayoutStore } from "./LayoutStore";
 import { HostToMainChannels, MainToHostChannels, PaneCommand, Rect } from "../shared/api";
 import { LayoutData, PaneConfig, paneZoomPresets, UserData } from "../shared/common";
-import { clampPaneZoom, isFiniteNumber, isRecord } from "./validation";
+import { clampPaneWidth, clampPaneZoom, isFiniteNumber, isRecord } from "./validation";
 
 const showDevTools = false;
 
@@ -38,6 +38,9 @@ function parsePaneCommand(value: unknown): PaneCommand | undefined {
         case "move-to":
             if (!Number.isInteger(value.index)) return;
             return { type: value.type, index: value.index as number };
+        case "set-width":
+            if (!isFiniteNumber(value.width)) return;
+            return { type: value.type, width: value.width };
         case "open-menu":
             if (!isFiniteNumber(value.x) || !isFiniteNumber(value.y)) return;
             return { type: value.type, x: value.x, y: value.y };
@@ -208,6 +211,9 @@ export class PaneHost {
             case "move-to":
                 this.moveTo(pane, command.index);
                 break;
+            case "set-width":
+                this.setPaneWidth(pane, command.width);
+                break;
             case "open-menu":
                 this.openPaneMenu(pane, command.x, command.y);
                 break;
@@ -301,6 +307,13 @@ export class PaneHost {
         ];
 
         Menu.buildFromTemplate(template).popup({ window: this.window, x: Math.round(x), y: Math.round(y) });
+    }
+
+    private setPaneWidth(pane: Pane, width: number) {
+        width = clampPaneWidth(width);
+        pane.data.width = width;
+        this.updatePaneConfig(pane.id, { width });
+        this.sendLayout();
     }
 
     private setPaneZoom(pane: Pane, zoom: number) {

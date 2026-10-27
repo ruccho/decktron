@@ -1,4 +1,4 @@
-import React, { useCallback } from "react"
+import React, { useCallback, useState } from "react"
 import UserIcon from "./UserIcon";
 import { PaneData, SessionData } from "../shared/common";
 import { PaneCommand } from "../shared/api";
@@ -9,6 +9,7 @@ import { usePaneSnapshot } from "./viewSuspension";
 import { getPaneTitle } from "./paneTitle";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import PaneResizeHandle from "./PaneResizeHandle";
 
 const Pane: React.FC<{
     pane: PaneData,
@@ -29,6 +30,10 @@ const Pane: React.FC<{
         window.decktron.send("pane-command", pane.id, command);
     }, [pane.id]);
 
+    // The width being dragged, or the committed width until the main process sends the updated pane.
+    const [widthOverride, setWidthOverride] = useState<{ base: PaneData, width: number } | null>(null);
+    const width = widthOverride?.base === pane ? widthOverride.width : pane.width;
+
     const openMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
         sendCommand({ type: "open-menu", x: rect.left, y: rect.bottom });
@@ -42,7 +47,7 @@ const Pane: React.FC<{
             className={`pane ${isDragging ? "dragging" : ""}`}
             style={{
                 backgroundColor: pane.themeColor,
-                width: pane.width,
+                width,
                 transform: CSS.Translate.toString(transform),
                 transition,
             }}>
@@ -87,6 +92,13 @@ const Pane: React.FC<{
             <div className="pane-content" ref={contentRef}>
                 {snapshot && <img className="pane-snapshot" src={snapshot} alt="" />}
             </div>
+            <PaneResizeHandle
+                width={pane.width}
+                onPreview={(value) => setWidthOverride(value === null ? null : { base: pane, width: value })}
+                onCommit={(value) => {
+                    setWidthOverride({ base: pane, width: value });
+                    sendCommand({ type: "set-width", width: value });
+                }} />
         </div>
     )
 };
