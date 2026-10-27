@@ -32,11 +32,19 @@ export class Decktron {
         });
 
         mainWindow.setMenu(null);
+        // Applying the bounds again after creation prevents the window from growing on every launch,
+        // which happens on Windows when the bounds are given only to the constructor.
+        if (bounds) mainWindow.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
         if (windowConfig?.maximized) mainWindow.maximize();
 
         const saveWindowConfig = () => {
             const { x, y, width, height } = mainWindow.getNormalBounds();
             const window: WindowConfig = { x, y, width, height, maximized: mainWindow.isMaximized() };
+            // With fractional display scaling, the bounds read back may differ from the applied ones by rounding.
+            // Ignoring such small differences keeps the window from drifting on every launch.
+            const saved = this.store.get().window;
+            if (saved && saved.maximized === window.maximized
+                && [saved.x - x, saved.y - y, saved.width - width, saved.height - height].every(d => Math.abs(d) <= 1)) return;
             this.store.update(state => ({ ...state, window }));
         };
         mainWindow.on("resize", saveWindowConfig);

@@ -1,28 +1,35 @@
-import { PaneData } from "./common";
+import { LayoutData } from "./common";
 
 export type PaneCommand =
     | { type: "refresh" }
     | { type: "back" }
     | { type: "forward" }
     | { type: "close" }
-    | { type: "set-view-enabled", enabled: boolean }
     | { type: "navigate", path: string }
-    | { type: "move", shift: number };
+    | { type: "move", shift: number }
+    | { type: "scroll-to-top" }
+    // Opens the pane menu at the given position in the host window's coordinates.
+    | { type: "open-menu", x: number, y: number };
 
 export type Size = { width: number, height: number };
 export type Point = { x: number, y: number };
+export type Rect = { x: number, y: number, width: number, height: number };
 
 // Messages sent from the host renderer to the main process.
 export type HostToMainChannels = {
-    "request-panes": [];
+    "request-layout": [];
     "pane-command": [paneId: string, command: PaneCommand];
-    "container-size": [size: Size];
-    "container-offset": [offset: Point];
+    // Bounds of the area where each pane's page is displayed, in the host window's coordinates.
+    "pane-bounds": [bounds: Record<string, Rect>];
+    // While suspended, pane pages are hidden so that the host renderer can draw over them.
+    "set-views-suspended": [suspended: boolean];
 };
 
 // Messages sent from the main process to the host renderer.
 export type MainToHostChannels = {
-    "panes": [panes: PaneData[]];
+    "layout": [layout: LayoutData];
+    // Images of pane pages captured when the views are suspended, as data URLs keyed by pane ID.
+    "pane-snapshots": [snapshots: Record<string, string>];
     "wheel-horizontal": [delta: number];
 };
 

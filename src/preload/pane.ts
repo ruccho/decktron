@@ -73,6 +73,10 @@ function preload() {
         else location.href = value;
     });
 
+    ipcRenderer.on("scroll-to-top", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
     document.addEventListener("DOMContentLoaded", () => {
 
         waitForElement(document.body, "header", true, (header) => {

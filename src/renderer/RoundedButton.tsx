@@ -2,17 +2,18 @@ import { MouseEventHandler, ReactNode } from "react";
 
 
 
-const UserIcon: React.FC<{
+const RoundedButton: React.FC<{
     children?: ReactNode
     onClick?: MouseEventHandler<HTMLButtonElement>,
-}> = ({ onClick, children }) => {
+    title?: string,
+}> = ({ onClick, title, children }) => {
 
     return (
-        <button className="rounded-button" onClick={onClick}>
+        <button className="rounded-button" onClick={onClick} title={title}>
             {children}
         </button>
     )
 
 };
 
-export default UserIcon;
+export default RoundedButton;

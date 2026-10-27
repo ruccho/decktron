@@ -2,7 +2,8 @@ import { app } from "electron";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { LayoutState, PaneConfig, SessionConfig, WindowConfig } from "../shared/common";
+import { defaultPaneZoom, LayoutState, PaneConfig, paneWidthLimits, SessionConfig, WindowConfig } from "../shared/common";
+import { clampPaneWidth, clampPaneZoom, isFiniteNumber, isRecord, parseUser } from "./validation";
 
 const defaultUrls = [
     "https://x.com/home",
@@ -16,11 +17,15 @@ const defaultSessionIds = ["0", "1"];
 
 const saveDelayMs = 500;
 
+export function createPaneConfig(sessionId: string, url: string): PaneConfig {
+    return { id: randomUUID(), sessionId, url, width: paneWidthLimits.default, zoom: defaultPaneZoom };
+}
+
 function createDefaultState(): LayoutState {
     const panes: PaneConfig[] = [];
     for (const url of defaultUrls) {
         for (const sessionId of defaultSessionIds) {
-            panes.push({ id: randomUUID(), sessionId, url });
+            panes.push(createPaneConfig(sessionId, url));
         }
     }
     return {
@@ -30,26 +35,28 @@ function createDefaultState(): LayoutState {
     };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
-}
-
 function parseSession(value: unknown): SessionConfig | undefined {
     if (!isRecord(value) || typeof value.id !== "string") return;
-    return { id: value.id };
+    return { id: value.id, user: parseUser(value.user) };
 }
 
 function parsePane(value: unknown, sessionIds: Set<string>): PaneConfig | undefined {
     if (!isRecord(value)) return;
     if (typeof value.id !== "string" || typeof value.sessionId !== "string" || typeof value.url !== "string") return;
     if (!sessionIds.has(value.sessionId)) return;
-    return { id: value.id, sessionId: value.sessionId, url: value.url };
+    return {
+        id: value.id,
+        sessionId: value.sessionId,
+        url: value.url,
+        width: isFiniteNumber(value.width) ? clampPaneWidth(value.width) : paneWidthLimits.default,
+        zoom: isFiniteNumber(value.zoom) ? clampPaneZoom(value.zoom) : defaultPaneZoom,
+    };
 }
 
 function parseWindow(value: unknown): WindowConfig | undefined {
     if (!isRecord(value)) return;
     const { x, y, width, height, maximized } = value;
-    if (![x, y, width, height].every(v => typeof v === "number" && Number.isFinite(v))) return;
+    if (![x, y, width, height].every(isFiniteNumber)) return;
     return {
         x: x as number,
         y: y as number,

@@ -27,41 +27,41 @@ body {
   height: 100%;
 }
 
-.header{
-  min-width: 50px;
-  max-width: 50px;
-}
-
 .app{
-  display:flex;
-  flex-direction: row;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
 }
 
 .pane-container {
   flex-grow: 1;
-  overflow: auto;
+  min-height: 0;
   display: flex;
   flex-direction: row;
+  gap: 4px;
+  padding: 4px;
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .pane{
-  min-width: 320px;
-  max-width: 320px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid #203242;
   border-radius: 10px;
   overflow: hidden;
+  background-color: #15202B;
 }
 
 .pane-header{
   height: 50px;
+  flex-shrink: 0;
   padding: 0 5px;
   display: flex;
   flex-direction: row;
+  align-items: center;
   box-shadow: 0 0 20px black;
 }
 
@@ -71,20 +71,53 @@ body {
   height: 100%;
 }
 
-.pane-header-control{
+.pane-header-title{
   flex-grow: 1;
-  display: flex;
-  flex-direction: row;
+  min-width: 0;
+  height: 40px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: #e7e9ea;
+  text-align: left;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.pane-header-title:hover{
+  background-color: rgba(127, 127, 127, 0.2);
+}
+
+.pane-header-title-main{
+  font-size: 14px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pane-header-title-sub{
+  font-size: 11px;
+  color: rgba(127, 127, 127, 1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pane-header-menu-button{
+  flex-shrink: 0;
+  width: 32px;
+  height: 40px;
+}
+
+.pane-header-menu-button:first-child{
   width: 40px;
-  margin: 5px 0;
-  gap: 5px;
 }
 
 .user-icon{
   background-size: cover;
+  background-color: rgba(127, 127, 127, 0.3);
   border-radius: 999px;
   width: 100%;
   height: 100%;
@@ -107,46 +140,19 @@ body {
   background-color: rgba(127, 127, 127, 0.2);
 }
 
-.pane-header-menu-button-right
-{
-  margin-left: auto;
-}
-
 .pane-content{
   flex-grow: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
 }
 
-.pane-content-menu{
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  padding: 5px;
-  align-self: center;
-  width: 310px;
-  padding-top: 20px;
-}
-
-.pane-content-menu-item{
-  min-width: 100px;
-  min-height: 100px;
-  padding: 5px;
-  color: rgba(127, 127, 127, 1);
-  align-self: flex-start;
-}
-
-.pane-content-menu-item .rounded-button{
-  margin: 0 auto;
-  width: 60px;
-  height: 60px;
-  font-size: large;
-}
-
-.pane-content-menu-item-label{
-  text-align: center;
-  font-size: small;
-  cursor: default;
+.pane-snapshot{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: left top;
 }

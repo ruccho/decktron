@@ -1,7 +1,11 @@
+// Pane state sent to the host renderer.
 export type PaneData = {
     id: string;
-    session: SessionData;
-    viewEnabled: boolean;
+    sessionId: string;
+    // The URL currently displayed, which may differ from the persisted one.
+    url: string;
+    width: number;
+    zoom: number;
     themeColor?: string;
 };
 
@@ -10,12 +14,21 @@ export type SessionData = {
     user?: UserData;
 }
 
+export type LayoutData = {
+    sessions: SessionData[];
+    panes: PaneData[];
+};
+
 export type UserData = {
     id: string;
     screenName: string;
     displayName: string;
     profileImageUrl: string;
 }
+
+export const paneWidthLimits = { min: 280, max: 800, default: 320 };
+export const paneZoomPresets = [0.6, 0.7, 0.8, 0.9, 1.0];
+export const defaultPaneZoom = 0.8;
 
 // Persistent state of the application, saved as JSON in the user data directory.
 export type LayoutState = {
@@ -27,12 +40,16 @@ export type LayoutState = {
 
 export type SessionConfig = {
     id: string;
+    // Cached so that the account can be shown before its pages are loaded.
+    user?: UserData;
 };
 
 export type PaneConfig = {
     id: string;
     sessionId: string;
     url: string;
+    width: number;
+    zoom: number;
 };
 
 export type WindowConfig = {

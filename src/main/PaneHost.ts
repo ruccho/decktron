@@ -1,31 +1,22 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, Menu, MenuItemConstructorOptions, shell } from "electron";
 import { Pane } from "./Pane";
+import { PaneSession } from "./PaneSession";
 import { SessionManager } from "./SessionManager";
 import { LayoutStore } from "./LayoutStore";
-import { HostToMainChannels, MainToHostChannels, PaneCommand, Point, Size } from "../shared/api";
-import { PaneConfig } from "../shared/common";
+import { HostToMainChannels, MainToHostChannels, PaneCommand, Rect } from "../shared/api";
+import { LayoutData, PaneConfig, paneZoomPresets, UserData } from "../shared/common";
+import { clampPaneZoom, isFiniteNumber, isRecord } from "./validation";
 
 const showDevTools = false;
 
 // Replaces each argument type with unknown, keeping the number of arguments.
 type Unvalidated<T extends unknown[]> = { [I in keyof T]: unknown };
 
-function isFiniteNumber(value: unknown): value is number {
-    return typeof value === "number" && Number.isFinite(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
-}
-
-function parseSize(value: unknown): Size | undefined {
-    if (!isRecord(value) || !isFiniteNumber(value.width) || !isFiniteNumber(value.height)) return;
-    return { width: value.width, height: value.height };
-}
-
-function parsePoint(value: unknown): Point | undefined {
-    if (!isRecord(value) || !isFiniteNumber(value.x) || !isFiniteNumber(value.y)) return;
-    return { x: value.x, y: value.y };
+function parseRect(value: unknown): Rect | undefined {
+    if (!isRecord(value)) return;
+    const { x, y, width, height } = value;
+    if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(width) || !isFiniteNumber(height)) return;
+    return { x, y, width, height };
 }
 
 function parsePaneCommand(value: unknown): PaneCommand | undefined {
@@ -35,16 +26,17 @@ function parsePaneCommand(value: unknown): PaneCommand | undefined {
         case "back":
         case "forward":
         case "close":
+        case "scroll-to-top":
             return { type: value.type };
-        case "set-view-enabled":
-            if (typeof value.enabled !== "boolean") return;
-            return { type: value.type, enabled: value.enabled };
         case "navigate":
             if (typeof value.path !== "string") return;
             return { type: value.type, path: value.path };
         case "move":
             if (!isFiniteNumber(value.shift)) return;
             return { type: value.type, shift: value.shift };
+        case "open-menu":
+            if (!isFiniteNumber(value.x) || !isFiniteNumber(value.y)) return;
+            return { type: value.type, x: value.x, y: value.y };
     }
 }
 
@@ -67,8 +59,10 @@ export class PaneHost {
     private readonly store: LayoutStore;
     private readonly panes: Pane[] = [];
     private readonly sessions: SessionManager = new SessionManager();
-    private contentSize: Size | undefined = undefined;
-    private contentOffset: Point = { x: 0, y: 0 };
+
+    private viewsSuspended = false;
+    // Incremented on every change of viewsSuspended to discard outdated asynchronous work.
+    private suspensionGeneration = 0;
 
     constructor(window: BrowserWindow, store: LayoutStore) {
 
@@ -76,19 +70,24 @@ export class PaneHost {
         this.store = store;
 
         for (const config of store.get().panes) {
-            this.panes.push(new Pane(this, this.sessions.get(config.sessionId), config));
+            this.createPane(config);
         }
 
         if (showDevTools && this.panes.length > 0) {
             this.panes[0].view.webContents.openDevTools();
         }
 
+        // A reloaded renderer does not know that the views were suspended.
+        window.webContents.on("did-finish-load", () => {
+            this.setViewsSuspended(false);
+        });
+
         window.webContents.ipc.on("log", (event, value) => {
             console.log(value);
         });
 
-        this.on("request-panes", () => {
-            this.sendPanes();
+        this.on("request-layout", () => {
+            this.sendLayout();
         });
 
         this.on("pane-command", (paneId, command) => {
@@ -98,19 +97,31 @@ export class PaneHost {
             this.handlePaneCommand(pane, parsedCommand);
         });
 
-        this.on("container-size", (value) => {
-            const size = parseSize(value);
-            if (!size) return;
-            this.contentSize = size;
-            this.adjustPanes();
+        this.on("pane-bounds", (value) => {
+            if (!isRecord(value)) return;
+            for (const pane of this.panes) {
+                const rect = parseRect(value[pane.id]);
+                if (!rect) continue;
+                pane.setBounds({
+                    x: Math.round(rect.x),
+                    y: Math.round(rect.y),
+                    width: Math.max(0, Math.round(rect.width)),
+                    height: Math.max(0, Math.round(rect.height)),
+                });
+            }
         });
 
-        this.on("container-offset", (value) => {
-            const offset = parsePoint(value);
-            if (!offset) return;
-            this.contentOffset = offset;
-            this.adjustPanes();
+        this.on("set-views-suspended", (value) => {
+            if (typeof value !== "boolean") return;
+            this.setViewsSuspended(value);
         });
+    }
+
+    private createPane(config: PaneConfig, index = this.panes.length) {
+        const pane = new Pane(this, this.sessions.get(config.sessionId), config);
+        this.panes.splice(index, 0, pane);
+        if (!this.viewsSuspended) this.window.contentView.addChildView(pane.view);
+        return pane;
     }
 
     private handlePaneCommand(pane: Pane, command: PaneCommand) {
@@ -120,6 +131,9 @@ export class PaneHost {
                 break;
             case "move":
                 this.moveShift(pane, command.shift);
+                break;
+            case "open-menu":
+                this.openPaneMenu(pane, command.x, command.y);
                 break;
             default:
                 pane.handleCommand(command);
@@ -131,14 +145,14 @@ export class PaneHost {
         const index = this.panes.indexOf(pane);
         if (index < 0) return;
 
+        this.window.contentView.removeChildView(pane.view);
         pane.dispose();
         this.panes.splice(index, 1);
         this.store.update(state => ({
             ...state,
             panes: state.panes.filter(p => p.id !== pane.id),
         }));
-        this.sendPanes();
-        this.adjustPanes();
+        this.sendLayout();
     }
 
     public moveShift(pane: Pane, shift: number) {
@@ -151,35 +165,124 @@ export class PaneHost {
         this.panes.splice(currentIndex, 1);
         this.panes.splice(newIndex, 0, pane);
         this.savePaneOrder();
-        this.sendPanes();
-        this.adjustPanes();
+        this.sendLayout();
     }
 
-    public addView(pane: Pane) {
-        this.window.contentView.addChildView(pane.view);
-        this.adjustPanes();
+    private openPaneMenu(pane: Pane, x: number, y: number) {
+        const screenName = this.store.get().sessions.find(s => s.id === pane.session.id)?.user?.screenName;
+        const index = this.panes.indexOf(pane);
+
+        const navigate = (label: string, path: string | undefined): MenuItemConstructorOptions => ({
+            label,
+            enabled: path !== undefined,
+            click: () => {
+                if (path !== undefined) pane.handleCommand({ type: "navigate", path });
+            },
+        });
+
+        const template: MenuItemConstructorOptions[] = [
+            navigate("Post", "/compose/post"),
+            { type: "separator" },
+            navigate("Home", "/home"),
+            navigate("Explore", "/explore"),
+            navigate("Notifications", "/notifications"),
+            navigate("Messages", "/messages"),
+            navigate("Bookmarks", "/i/bookmarks"),
+            navigate("Lists", screenName && `/${screenName}/lists`),
+            navigate("Communities", screenName && `/${screenName}/communities`),
+            navigate("Profile", screenName && `/${screenName}`),
+            navigate("Drafts", "/compose/post/unsent/drafts"),
+            navigate("Settings", "/settings"),
+            { type: "separator" },
+            {
+                label: "Zoom",
+                submenu: paneZoomPresets.map(zoom => ({
+                    label: `${Math.round(zoom * 100)}%`,
+                    type: "radio",
+                    checked: Math.abs(pane.data.zoom - zoom) < 0.001,
+                    click: () => this.setPaneZoom(pane, zoom),
+                })),
+            },
+            { label: "Move Left", enabled: index > 0, click: () => this.moveShift(pane, -1) },
+            { label: "Move Right", enabled: index < this.panes.length - 1, click: () => this.moveShift(pane, 1) },
+            {
+                label: "Open in Browser",
+                enabled: /^https?:/.test(pane.data.url),
+                click: () => shell.openExternal(pane.data.url),
+            },
+            { type: "separator" },
+            { label: "Close Pane", click: () => this.remove(pane) },
+        ];
+
+        Menu.buildFromTemplate(template).popup({ window: this.window, x: Math.round(x), y: Math.round(y) });
     }
 
-    public removeView(pane: Pane) {
-        this.window.contentView.removeChildView(pane.view);
-        this.adjustPanes();
+    private setPaneZoom(pane: Pane, zoom: number) {
+        zoom = clampPaneZoom(zoom);
+        pane.setZoom(zoom);
+        this.updatePaneConfig(pane.id, { zoom });
+        this.sendLayout();
     }
 
     public onPaneDataChanged() {
-        // Panes that share a session also share its data, so all panes are sent at once.
-        this.sendPanes();
+        this.sendLayout();
     }
 
     public onPaneNavigated(pane: Pane, url: string) {
+        this.sendLayout();
         if (!isRestorableUrl(url)) return;
-        this.store.update(state => ({
-            ...state,
-            panes: state.panes.map(p => p.id === pane.id ? { ...p, url } : p),
-        }));
+        this.updatePaneConfig(pane.id, { url });
     }
 
     public onPaneWheelHorizontal(delta: number) {
         this.send("wheel-horizontal", delta);
+    }
+
+    public onSessionUserChanged(session: PaneSession, user: UserData) {
+        const current = this.store.get().sessions.find(s => s.id === session.id)?.user;
+        if (current && JSON.stringify(current) === JSON.stringify(user)) return;
+        this.store.update(state => ({
+            ...state,
+            sessions: state.sessions.map(s => s.id === session.id ? { ...s, user } : s),
+        }));
+        this.sendLayout();
+    }
+
+    private async setViewsSuspended(suspended: boolean) {
+        if (this.viewsSuspended === suspended) return;
+        this.viewsSuspended = suspended;
+        const generation = ++this.suspensionGeneration;
+
+        if (!suspended) {
+            for (const pane of this.panes) {
+                this.window.contentView.addChildView(pane.view);
+            }
+            return;
+        }
+
+        // Send the snapshots before hiding the views so that the renderer can show them in their place.
+        const snapshots: Record<string, string> = {};
+        await Promise.all(this.panes.map(async pane => {
+            try {
+                const snapshot = await pane.capture();
+                if (snapshot) snapshots[pane.id] = snapshot;
+            } catch (e) {
+                console.error(e);
+            }
+        }));
+        if (generation !== this.suspensionGeneration) return;
+
+        this.send("pane-snapshots", snapshots);
+        for (const pane of this.panes) {
+            this.window.contentView.removeChildView(pane.view);
+        }
+    }
+
+    private updatePaneConfig(paneId: string, values: Partial<Omit<PaneConfig, "id">>) {
+        this.store.update(state => ({
+            ...state,
+            panes: state.panes.map(p => p.id === paneId ? { ...p, ...values } : p),
+        }));
     }
 
     private savePaneOrder() {
@@ -192,8 +295,12 @@ export class PaneHost {
         });
     }
 
-    private sendPanes() {
-        this.send("panes", this.panes.map(p => p.data));
+    private sendLayout() {
+        const layout: LayoutData = {
+            sessions: this.store.get().sessions.map(s => ({ id: s.id, user: s.user })),
+            panes: this.panes.map(p => ({ ...p.data })),
+        };
+        this.send("layout", layout);
     }
 
     private send<K extends keyof MainToHostChannels>(channel: K, ...args: MainToHostChannels[K]) {
@@ -205,24 +312,5 @@ export class PaneHost {
         this.window.webContents.ipc.on(channel, (event, ...args) => {
             (callback as (...args: unknown[]) => void)(...args);
         });
-    }
-
-    private adjustPanes() {
-        const size = this.window.getContentSize();
-
-        const contentHeight = this.contentSize?.height ?? size[1];
-
-        const width = 320;
-
-        for (let i = 0; i < this.panes.length; i++) {
-            const view = this.panes[i].view;
-            const left = Math.round(i * width + this.contentOffset.x);
-            const right = Math.round((i + 1) * width + this.contentOffset.x);
-            const top = Math.round(this.contentOffset.y);
-            const bottom = Math.round(contentHeight + this.contentOffset.y);
-
-            const bounds = { x: left + 1, y: top, width: right - left - 1, height: bottom - top };
-            view.setBounds(bounds);
-        }
     }
 }
