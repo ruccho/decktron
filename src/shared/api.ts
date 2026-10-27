@@ -30,6 +30,8 @@ export type HostToMainChannels = {
     "add-account": [];
     // Opens the account menu at the given position in the host window's coordinates.
     "open-session-menu": [sessionId: string, x: number, y: number];
+    // Reopens the pane closed most recently.
+    "restore-closed-pane": [];
 };
 
 // Messages sent from the main process to the host renderer.
@@ -40,6 +42,8 @@ export type MainToHostChannels = {
     "wheel-horizontal": [delta: number];
     // Requested from a native menu. The account is preselected if given.
     "open-add-pane-dialog": [sessionId: string | null];
+    // Sent when a pane is closed in a way that can be undone.
+    "pane-closed": [url: string];
 };
 
 // API exposed to the host renderer through contextBridge as `window.decktron`.

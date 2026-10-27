@@ -1,11 +1,11 @@
-import { BrowserWindow, dialog, Menu, MenuItemConstructorOptions, shell } from "electron";
+import { BrowserWindow, dialog, Input, Menu, MenuItemConstructorOptions, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { Pane } from "./Pane";
 import { PaneSession } from "./PaneSession";
 import { SessionManager } from "./SessionManager";
 import { createPaneConfig, LayoutStore } from "./LayoutStore";
 import { HostToMainChannels, MainToHostChannels, PaneCommand, Rect } from "../shared/api";
-import { LayoutData, PaneConfig, paneZoomPresets, UserData } from "../shared/common";
+import { defaultPaneZoom, LayoutData, PaneConfig, paneZoomPresets, UserData } from "../shared/common";
 import { clampPaneWidth, clampPaneZoom, isFiniteNumber, isRecord } from "./validation";
 
 const showDevTools = false;
@@ -75,6 +75,9 @@ export class PaneHost {
     private readonly panes: Pane[] = [];
     private readonly sessions: SessionManager = new SessionManager();
 
+    // The pane closed most recently by the user, which can be restored.
+    private lastClosed: { config: PaneConfig, index: number } | null = null;
+
     private viewsSuspended = false;
     // Incremented on every change of viewsSuspended to discard outdated asynchronous work.
     private suspensionGeneration = 0;
@@ -95,6 +98,10 @@ export class PaneHost {
         // A reloaded renderer does not know that the views were suspended.
         window.webContents.on("did-finish-load", () => {
             this.setViewsSuspended(false);
+        });
+
+        window.webContents.on("before-input-event", (event, input) => {
+            if (this.handleShortcut(undefined, input)) event.preventDefault();
         });
 
         window.webContents.ipc.on("log", (event, value) => {
@@ -143,6 +150,10 @@ export class PaneHost {
             this.add(createPaneConfig(sessionId, "https://x.com/home"));
         });
 
+        this.on("restore-closed-pane", () => {
+            this.restoreClosedPane();
+        });
+
         this.on("open-session-menu", (sessionId, x, y) => {
             if (typeof sessionId !== "string" || !isFiniteNumber(x) || !isFiniteNumber(y)) return;
             if (!this.store.get().sessions.some(s => s.id === sessionId)) return;
@@ -182,8 +193,9 @@ export class PaneHost {
         if (response !== 0) return;
 
         for (const pane of this.panes.filter(p => p.session.id === sessionId)) {
-            this.remove(pane);
+            this.remove(pane, false);
         }
+        if (this.lastClosed?.config.sessionId === sessionId) this.lastClosed = null;
         this.store.update(state => ({ ...state, sessions: state.sessions.filter(s => s.id !== sessionId) }));
         this.sendLayout();
         try {
@@ -223,9 +235,18 @@ export class PaneHost {
         }
     }
 
-    public remove(pane: Pane) {
+    public remove(pane: Pane, undoable = true) {
         const index = this.panes.indexOf(pane);
         if (index < 0) return;
+
+        const config = this.store.get().panes.find(p => p.id === pane.id);
+        if (undoable && config) {
+            this.lastClosed = { config, index };
+            this.send("pane-closed", pane.data.url);
+        }
+
+        // Keyboard shortcuts are received only by a focused web contents.
+        if (pane.view.webContents.isFocused()) this.window.webContents.focus();
 
         this.window.contentView.removeChildView(pane.view);
         pane.dispose();
@@ -235,6 +256,81 @@ export class PaneHost {
             panes: state.panes.filter(p => p.id !== pane.id),
         }));
         this.sendLayout();
+    }
+
+    private restoreClosedPane() {
+        const closed = this.lastClosed;
+        if (!closed) return;
+        this.lastClosed = null;
+        if (!this.store.get().sessions.some(s => s.id === closed.config.sessionId)) return;
+
+        const index = Math.min(closed.index, this.panes.length);
+        this.createPane(closed.config, index);
+        this.store.update(state => ({ ...state, panes: [...state.panes, closed.config] }));
+        this.savePaneOrder();
+        this.sendLayout();
+    }
+
+    public onPaneInput(pane: Pane, input: Input) {
+        return this.handleShortcut(pane, input);
+    }
+
+    // Handles a keyboard shortcut pressed in a pane, or in the host renderer if pane is undefined.
+    // Returns true if the input was handled.
+    private handleShortcut(pane: Pane | undefined, input: Input) {
+        if (input.type !== "keyDown") return false;
+        const ctrl = input.control || input.meta;
+
+        if (ctrl && input.shift && input.code === "KeyT") {
+            this.restoreClosedPane();
+            return true;
+        }
+        if (ctrl && !input.shift && input.code === "KeyT") {
+            this.send("open-add-pane-dialog", pane?.session.id ?? null);
+            return true;
+        }
+
+        if (!pane) return false;
+
+        if (input.alt && !ctrl && input.code === "ArrowLeft") {
+            pane.handleCommand({ type: "back" });
+            return true;
+        }
+        if (input.alt && !ctrl && input.code === "ArrowRight") {
+            pane.handleCommand({ type: "forward" });
+            return true;
+        }
+        if (input.code === "F5" || (ctrl && input.code === "KeyR")) {
+            pane.handleCommand({ type: "refresh" });
+            return true;
+        }
+        if (ctrl && input.shift && input.code === "ArrowLeft") {
+            this.moveShift(pane, -1);
+            return true;
+        }
+        if (ctrl && input.shift && input.code === "ArrowRight") {
+            this.moveShift(pane, 1);
+            return true;
+        }
+        if (ctrl && input.code === "KeyW") {
+            this.remove(pane);
+            return true;
+        }
+        if (ctrl && (input.code === "Equal" || input.code === "Semicolon" || input.code === "NumpadAdd")) {
+            const next = paneZoomPresets.find(z => z > pane.data.zoom + 0.001);
+            if (next !== undefined) this.setPaneZoom(pane, next);
+            return true;
+        }
+        if (ctrl && (input.code === "Minus" || input.code === "NumpadSubtract")) {
+            const previous = [...paneZoomPresets].reverse().find(z => z < pane.data.zoom - 0.001);
+            if (previous !== undefined) this.setPaneZoom(pane, previous);
+            return true;
+        }
+        if (ctrl && (input.code === "Digit0" || input.code === "Numpad0")) {
+            this.setPaneZoom(pane, defaultPaneZoom);
+            return true;
+        }
+        return false;
     }
 
     public moveShift(pane: Pane, shift: number) {
@@ -358,6 +454,9 @@ export class PaneHost {
             }
             return;
         }
+
+        // Keyboard input goes to the host renderer, which draws over the panes while they are suspended.
+        this.window.webContents.focus();
 
         // Send the snapshots before hiding the views so that the renderer can show them in their place.
         const snapshots: Record<string, string> = {};

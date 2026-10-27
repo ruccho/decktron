@@ -388,3 +388,19 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+.closed-pane-notice{
+  margin-left: auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e7e9ea;
+  font-size: 13px;
+}
+
+.closed-pane-notice-text{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

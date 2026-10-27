@@ -82,6 +82,9 @@ export class Pane {
                 cssOrigin: "user"
             })
         });
+        this.view.webContents.on("before-input-event", (event, input) => {
+            if (this.host.onPaneInput(this, input)) event.preventDefault();
+        });
         this.view.webContents.on("did-navigate", (event, url) => {
             this.onNavigated(url);
         });

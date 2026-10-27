@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faUserPlus } from "@fortawesome/free-solid-svg-icons";
 import { SessionData } from "../shared/common";
 import UserIcon from "./UserIcon";
+import ClosedPaneNotice from "./ClosedPaneNotice";
 
 const TopBar: React.FC<{
     sessions: SessionData[],
@@ -30,6 +31,7 @@ const TopBar: React.FC<{
             <button className="top-bar-button" onClick={() => window.decktron.send("add-account")} title="Add account">
                 <FontAwesomeIcon icon={faUserPlus} />
             </button>
+            <ClosedPaneNotice />
         </div>
     );
 };
