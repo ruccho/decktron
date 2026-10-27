@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, Input, Menu, MenuItemConstructorOptions, shell } from "electron";
+import { BrowserWindow, dialog, Input, Menu, MenuItemConstructorOptions, shell, View } from "electron";
 import { randomUUID } from "node:crypto";
 import { Pane } from "./Pane";
 import { PaneSession } from "./PaneSession";
@@ -71,6 +71,9 @@ function isRestorableUrl(url: string) {
 export class PaneHost {
 
     private readonly window: BrowserWindow;
+    // Parent of the pane views, placed over the pane container of the host renderer.
+    // The pane views are clipped to it so that they do not cover the rest of the host renderer.
+    private readonly paneArea = new View();
     private readonly store: LayoutStore;
     private readonly panes: Pane[] = [];
     private readonly sessions: SessionManager = new SessionManager();
@@ -86,6 +89,9 @@ export class PaneHost {
 
         this.window = window;
         this.store = store;
+
+        this.paneArea.setBackgroundColor("#00000000");
+        window.contentView.addChildView(this.paneArea);
 
         for (const config of store.get().panes) {
             this.createPane(config);
@@ -119,14 +125,23 @@ export class PaneHost {
             this.handlePaneCommand(pane, parsedCommand);
         });
 
-        this.on("pane-bounds", (value) => {
-            if (!isRecord(value)) return;
+        this.on("pane-bounds", (containerValue, value) => {
+            const container = parseRect(containerValue);
+            if (!container || !isRecord(value)) return;
+            const containerX = Math.round(container.x);
+            const containerY = Math.round(container.y);
+            this.paneArea.setBounds({
+                x: containerX,
+                y: containerY,
+                width: Math.max(0, Math.round(container.width)),
+                height: Math.max(0, Math.round(container.height)),
+            });
             for (const pane of this.panes) {
                 const rect = parseRect(value[pane.id]);
                 if (!rect) continue;
                 pane.setBounds({
-                    x: Math.round(rect.x),
-                    y: Math.round(rect.y),
+                    x: Math.round(rect.x) - containerX,
+                    y: Math.round(rect.y) - containerY,
                     width: Math.max(0, Math.round(rect.width)),
                     height: Math.max(0, Math.round(rect.height)),
                 });
@@ -208,7 +223,7 @@ export class PaneHost {
     private createPane(config: PaneConfig, index = this.panes.length) {
         const pane = new Pane(this, this.sessions.get(config.sessionId), config);
         this.panes.splice(index, 0, pane);
-        if (!this.viewsSuspended) this.window.contentView.addChildView(pane.view);
+        if (!this.viewsSuspended) this.paneArea.addChildView(pane.view);
         return pane;
     }
 
@@ -248,7 +263,7 @@ export class PaneHost {
         // Keyboard shortcuts are received only by a focused web contents.
         if (pane.view.webContents.isFocused()) this.window.webContents.focus();
 
-        this.window.contentView.removeChildView(pane.view);
+        this.paneArea.removeChildView(pane.view);
         pane.dispose();
         this.panes.splice(index, 1);
         this.store.update(state => ({
@@ -450,7 +465,7 @@ export class PaneHost {
 
         if (!suspended) {
             for (const pane of this.panes) {
-                this.window.contentView.addChildView(pane.view);
+                this.paneArea.addChildView(pane.view);
             }
             return;
         }
@@ -472,7 +487,7 @@ export class PaneHost {
 
         this.send("pane-snapshots", snapshots);
         for (const pane of this.panes) {
-            this.window.contentView.removeChildView(pane.view);
+            this.paneArea.removeChildView(pane.view);
         }
     }
 

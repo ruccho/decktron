@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faRotateLeft } from "@fortawesome/free-solid-svg-icons";
 import { getPaneTitle } from "./paneTitle";
 
 const noticeDurationMs = 8000;
 
-// Shows that a pane was closed, with a button to restore it.
+// A button shown for a while after a pane is closed, which restores the pane.
 const ClosedPaneNotice: React.FC = () => {
     const [closed, setClosed] = useState<{ title: string, time: number } | null>(null);
 
@@ -20,13 +22,17 @@ const ClosedPaneNotice: React.FC = () => {
     if (!closed) return null;
 
     return (
-        <div className="closed-pane-notice">
-            <span className="closed-pane-notice-text">Closed {closed.title}</span>
-            <button className="top-bar-button" onClick={() => {
+        <button
+            // Restarts the animation when another pane is closed.
+            key={closed.time}
+            className="side-bar-button closed-pane-notice"
+            title={`Reopen closed pane: ${closed.title}`}
+            onClick={() => {
                 window.decktron.send("restore-closed-pane");
                 setClosed(null);
-            }}>Undo</button>
-        </div>
+            }}>
+            <FontAwesomeIcon icon={faRotateLeft} />
+        </button>
     );
 };
 

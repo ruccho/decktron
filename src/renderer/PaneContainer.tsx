@@ -54,16 +54,20 @@ const PaneContainer: React.FC<{
             const container = paneContainer.current;
             if (!container) return;
 
-            // Pages are clipped to the container so that they do not cover the rest of the host window.
+            // The main process clips the pages to the container's client area, excluding the scroll bar.
             const containerRect = container.getBoundingClientRect();
+            const clientRect: Rect = {
+                x: containerRect.left + container.clientLeft,
+                y: containerRect.top + container.clientTop,
+                width: container.clientWidth,
+                height: container.clientHeight,
+            };
             const bounds: Record<string, Rect> = {};
             for (const [id, element] of contentElements.current) {
                 const rect = element.getBoundingClientRect();
-                const top = Math.max(rect.top, containerRect.top);
-                const bottom = Math.min(rect.bottom, containerRect.bottom);
-                bounds[id] = { x: rect.left, y: top, width: rect.width, height: Math.max(0, bottom - top) };
+                bounds[id] = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
             }
-            window.decktron.send("pane-bounds", bounds);
+            window.decktron.send("pane-bounds", clientRect, bounds);
         });
     }, []);
 

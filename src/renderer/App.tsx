@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import PaneContainer from './PaneContainer';
-import TopBar from './TopBar';
+import SideBar from './SideBar';
 import AddPaneDialog from './AddPaneDialog';
 import { useLayout } from './useLayout';
 
@@ -18,7 +18,7 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
-      <TopBar sessions={layout.sessions} onAddPane={openAddPaneDialog} />
+      <SideBar sessions={layout.sessions} onAddPane={openAddPaneDialog} />
       <PaneContainer layout={layout} onAddPane={openAddPaneDialog} />
       {addPaneSessionId !== undefined && (
         <AddPaneDialog

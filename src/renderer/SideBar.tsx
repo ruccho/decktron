@@ -5,30 +5,29 @@ import { SessionData } from "../shared/common";
 import UserIcon from "./UserIcon";
 import ClosedPaneNotice from "./ClosedPaneNotice";
 
-const TopBar: React.FC<{
+const SideBar: React.FC<{
     sessions: SessionData[],
     onAddPane: () => void,
 }> = ({ sessions, onAddPane }) => {
     return (
-        <div className="top-bar">
-            <button className="top-bar-button primary" onClick={onAddPane} title="Add pane">
+        <div className="side-bar">
+            <button className="side-bar-button primary" onClick={onAddPane} title="Add pane">
                 <FontAwesomeIcon icon={faPlus} />
-                <span>Add Pane</span>
             </button>
-            <div className="top-bar-separator" />
+            <div className="side-bar-separator" />
             {sessions.map(session => (
                 <button
                     key={session.id}
-                    className="top-bar-account"
+                    className="side-bar-account"
                     title={session.user ? `@${session.user.screenName}` : "Not logged in"}
                     onClick={(event) => {
                         const rect = event.currentTarget.getBoundingClientRect();
-                        window.decktron.send("open-session-menu", session.id, rect.left, rect.bottom);
+                        window.decktron.send("open-session-menu", session.id, rect.right, rect.top);
                     }}>
                     <UserIcon user={session.user} />
                 </button>
             ))}
-            <button className="top-bar-button" onClick={() => window.decktron.send("add-account")} title="Add account">
+            <button className="side-bar-button" onClick={() => window.decktron.send("add-account")} title="Add account">
                 <FontAwesomeIcon icon={faUserPlus} />
             </button>
             <ClosedPaneNotice />
@@ -36,4 +35,4 @@ const TopBar: React.FC<{
     );
 };
 
-export default TopBar;
+export default SideBar;

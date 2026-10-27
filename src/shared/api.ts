@@ -21,8 +21,9 @@ export type Rect = { x: number, y: number, width: number, height: number };
 export type HostToMainChannels = {
     "request-layout": [];
     "pane-command": [paneId: string, command: PaneCommand];
-    // Bounds of the area where each pane's page is displayed, in the host window's coordinates.
-    "pane-bounds": [bounds: Record<string, Rect>];
+    // Bounds of the pane container and of the area where each pane's page is displayed,
+    // in the host window's coordinates.
+    "pane-bounds": [container: Rect, bounds: Record<string, Rect>];
     // While suspended, pane pages are hidden so that the host renderer can draw over them.
     "set-views-suspended": [suspended: boolean];
     "add-pane": [sessionId: string, url: string];

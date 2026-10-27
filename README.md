@@ -4,8 +4,9 @@ Work in progress.
 
 ### Usage
 
-- Add a pane with the "Add Pane" button in the top bar or the "+" column at the end of the panes.
-- Add an account with the button next to the account icons. Click an account icon to add a pane for the account or to remove the account.
+- Add a pane with the "+" button at the top of the sidebar or the "+" column at the end of the panes.
+- Add an account with the button below the account icons in the sidebar. Click an account icon to add a pane for the account or to remove the account.
+- After closing a pane, a button for reopening it appears at the bottom of the sidebar for a few seconds.
 - Open the pane menu with the icon or the menu button in the pane header.
 - Drag a pane header to reorder panes, and drag the gap at the right edge of a pane to resize it. Double-click the gap to reset the width.
 - Click the title in a pane header to scroll the page to the top.
