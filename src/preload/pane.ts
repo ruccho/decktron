@@ -164,9 +164,10 @@ function fetchInitialOrTop() {
 
     const stateNode = getAncestor(timelineFiber, 29)?.stateNode;
 
-    if (!stateNode._timelineRenderer._isAtNewest()) return;
+    // The internal structure of the page may change, so every step is optional.
+    if (!stateNode?._timelineRenderer?._isAtNewest?.()) return;
 
-    stateNode?._timelineAPI?.fetchTop();
+    stateNode._timelineAPI?.fetchTop?.();
 }
 
 setInterval(() => {
