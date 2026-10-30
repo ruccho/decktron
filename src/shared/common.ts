@@ -1,0 +1,131 @@
+// Pane state sent to the host renderer.
+export type PaneData = {
+    id: string;
+    sessionId: string;
+    // The URL currently displayed, which may differ from the persisted one.
+    url: string;
+    width: number;
+    zoom: number;
+    themeColor?: string;
+};
+
+export type SessionData = {
+    id: string;
+    user?: UserData;
+}
+
+export type LayoutData = {
+    sessions: SessionData[];
+    panes: PaneData[];
+};
+
+export type UserData = {
+    id: string;
+    screenName: string;
+    displayName: string;
+    profileImageUrl: string;
+}
+
+export const paneWidthLimits = { min: 280, max: 800, default: 320 };
+export const paneZoomPresets = [0.6, 0.7, 0.8, 0.9, 1.0];
+export const defaultPaneZoom = 0.8;
+
+// Persistent state of the application, saved as JSON in the user data directory.
+export type LayoutState = {
+    version: 1;
+    sessions: SessionConfig[];
+    panes: PaneConfig[];
+    window?: WindowConfig;
+};
+
+export type SessionConfig = {
+    id: string;
+    // Cached so that the account can be shown before its pages are loaded.
+    user?: UserData;
+};
+
+export type PaneConfig = {
+    id: string;
+    sessionId: string;
+    url: string;
+    width: number;
+    zoom: number;
+};
+
+export type WindowConfig = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    maximized: boolean;
+};
+
+export type XInitialState = {
+    entities: {
+        users: {
+            entities: Record<string, {
+                id_str: string,
+                name: string,
+                screen_name: string,
+                location: string | null,
+                url: string | null,
+                description: string | null,
+                verified: boolean,
+                followers_count: number,
+                friends_count: number,
+                listed_count: number,
+                favourites_count: number,
+                statuses_count: number,
+                created_at: string,
+                profile_banner_url: string,
+                profile_image_url_https: string,
+                default_profile: boolean,
+                default_profile_image: boolean,
+                withheld_in_countries: string[],
+
+                can_dm?: boolean,
+                can_media_tag?: boolean,
+                entities?: {
+                    description?: {
+                        urls?: []
+                    },
+                    url?: {
+                        urls?:
+                        {
+                            display_url?: string,
+                            expanded_url_?: string,
+                            url?: string,
+                            indices?: number[]
+                        }[]
+                    }
+                },
+                fast_followers_count?: number,
+                has_custom_timelines?: boolean,
+                is_translator?: boolean,
+                media_count?: number,
+                needs_phone_verification?: boolean,
+                normal_followers_count?: number,
+                pinned_tweet_ids_str?: string[],
+                possibly_sensitive?: boolean,
+                profile_interstitial_type?: string,
+                translator_type?: string,
+                want_retweets?: boolean,
+                is_profile_translatable?: boolean,
+                profile_image_shape?: string,
+                is_blue_verified?: boolean,
+                birthdate?: {
+                    day?: number,
+                    month?: number,
+                    year?: number,
+                    visibility?: string,
+                    year_visibility?: string
+                },
+                has_graduated_access?: true,
+                blocked_by?: boolean,
+                muting?: boolean,
+                blocking?: boolean
+            }>
+        }
+    }
+    
+}

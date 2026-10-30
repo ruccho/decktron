@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node", "electron-vite/node", "vite/client"],
+    "strict": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true
+  },
+  "include": ["electron.vite.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"]
+}
