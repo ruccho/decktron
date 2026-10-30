@@ -21,12 +21,13 @@ export type Rect = { x: number, y: number, width: number, height: number };
 export type HostToMainChannels = {
     "request-layout": [];
     "pane-command": [paneId: string, command: PaneCommand];
-    // Bounds of the pane container and of the area where each pane's page is displayed,
-    // in the host window's coordinates.
-    "pane-bounds": [container: Rect, bounds: Record<string, Rect>];
+    // Width of the side bar and the area where each pane's page is displayed, in the host window's coordinates.
+    "pane-bounds": [sideBarWidth: number, bounds: Record<string, Rect>];
     // While suspended, pane pages are hidden so that the host renderer can draw over them.
     "set-views-suspended": [suspended: boolean];
     "add-pane": [sessionId: string, url: string];
+    // Sent by the side bar view, which cannot show the dialog over the host renderer by itself.
+    "open-add-pane-dialog": [];
     // Adds a new account with a pane where the user can log in.
     "add-account": [];
     // Opens the account menu at the given position in the host window's coordinates.

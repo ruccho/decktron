@@ -1,5 +1,7 @@
-import { BrowserWindow, dialog, Input, Menu, MenuItemConstructorOptions, shell, View } from "electron";
+import { BrowserWindow, dialog, Input, Menu, MenuItemConstructorOptions, shell, WebContentsView } from "electron";
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { loadRenderer } from "./loadRenderer";
 import { Pane } from "./Pane";
 import { PaneSession } from "./PaneSession";
 import { SessionManager } from "./SessionManager";
@@ -71,9 +73,10 @@ function isRestorableUrl(url: string) {
 export class PaneHost {
 
     private readonly window: BrowserWindow;
-    // Parent of the pane views, placed over the pane container of the host renderer.
-    // The pane views are clipped to it so that they do not cover the rest of the host renderer.
-    private readonly paneArea = new View();
+    // A copy of the host renderer's side bar shown over the pane views. A parent view does not clip
+    // its children on macOS, so this covers the panes scrolled to the left of the pane container.
+    // A parent view is also avoided because its empty area swallows mouse input on macOS.
+    private readonly sideBarView: WebContentsView;
     private readonly store: LayoutStore;
     private readonly panes: Pane[] = [];
     private readonly sessions: SessionManager = new SessionManager();
@@ -90,8 +93,18 @@ export class PaneHost {
         this.window = window;
         this.store = store;
 
-        this.paneArea.setBackgroundColor("#00000000");
-        window.contentView.addChildView(this.paneArea);
+        this.sideBarView = new WebContentsView({
+            webPreferences: {
+                preload: join(__dirname, "../preload/host.js"),
+            },
+        });
+        // The view stays invisible until the host renderer reports the width of the side bar.
+        this.sideBarView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        this.sideBarView.webContents.on("before-input-event", (event, input) => {
+            if (this.handleShortcut(undefined, input)) event.preventDefault();
+        });
+        loadRenderer(this.sideBarView.webContents, "side-bar");
+        window.contentView.addChildView(this.sideBarView);
 
         for (const config of store.get().panes) {
             this.createPane(config);
@@ -125,23 +138,20 @@ export class PaneHost {
             this.handlePaneCommand(pane, parsedCommand);
         });
 
-        this.on("pane-bounds", (containerValue, value) => {
-            const container = parseRect(containerValue);
-            if (!container || !isRecord(value)) return;
-            const containerX = Math.round(container.x);
-            const containerY = Math.round(container.y);
-            this.paneArea.setBounds({
-                x: containerX,
-                y: containerY,
-                width: Math.max(0, Math.round(container.width)),
-                height: Math.max(0, Math.round(container.height)),
+        this.on("pane-bounds", (sideBarWidth, value) => {
+            if (!isFiniteNumber(sideBarWidth) || !isRecord(value)) return;
+            this.sideBarView.setBounds({
+                x: 0,
+                y: 0,
+                width: Math.max(0, Math.round(sideBarWidth)),
+                height: this.window.getContentSize()[1],
             });
             for (const pane of this.panes) {
                 const rect = parseRect(value[pane.id]);
                 if (!rect) continue;
                 pane.setBounds({
-                    x: Math.round(rect.x) - containerX,
-                    y: Math.round(rect.y) - containerY,
+                    x: Math.round(rect.x),
+                    y: Math.round(rect.y),
                     width: Math.max(0, Math.round(rect.width)),
                     height: Math.max(0, Math.round(rect.height)),
                 });
@@ -157,6 +167,10 @@ export class PaneHost {
             if (typeof sessionId !== "string" || typeof url !== "string") return;
             if (!this.store.get().sessions.some(s => s.id === sessionId) || !isValidPaneUrl(url)) return;
             this.add(createPaneConfig(sessionId, url));
+        });
+
+        this.on("open-add-pane-dialog", () => {
+            this.send("open-add-pane-dialog", null);
         });
 
         this.on("add-account", () => {
@@ -223,7 +237,10 @@ export class PaneHost {
     private createPane(config: PaneConfig, index = this.panes.length) {
         const pane = new Pane(this, this.sessions.get(config.sessionId), config);
         this.panes.splice(index, 0, pane);
-        if (!this.viewsSuspended) this.paneArea.addChildView(pane.view);
+        if (!this.viewsSuspended) {
+            this.window.contentView.addChildView(pane.view);
+            this.window.contentView.addChildView(this.sideBarView);
+        }
         return pane;
     }
 
@@ -257,13 +274,13 @@ export class PaneHost {
         const config = this.store.get().panes.find(p => p.id === pane.id);
         if (undoable && config) {
             this.lastClosed = { config, index };
-            this.send("pane-closed", pane.data.url);
+            this.sendToSideBars("pane-closed", pane.data.url);
         }
 
         // Keyboard shortcuts are received only by a focused web contents.
         if (pane.view.webContents.isFocused()) this.window.webContents.focus();
 
-        this.paneArea.removeChildView(pane.view);
+        this.window.contentView.removeChildView(pane.view);
         pane.dispose();
         this.panes.splice(index, 1);
         this.store.update(state => ({
@@ -465,8 +482,9 @@ export class PaneHost {
 
         if (!suspended) {
             for (const pane of this.panes) {
-                this.paneArea.addChildView(pane.view);
+                this.window.contentView.addChildView(pane.view);
             }
+            this.window.contentView.addChildView(this.sideBarView);
             return;
         }
 
@@ -487,8 +505,10 @@ export class PaneHost {
 
         this.send("pane-snapshots", snapshots);
         for (const pane of this.panes) {
-            this.paneArea.removeChildView(pane.view);
+            this.window.contentView.removeChildView(pane.view);
         }
+        // The host renderer draws its own side bar, which dialogs can cover.
+        this.window.contentView.removeChildView(this.sideBarView);
     }
 
     private updatePaneConfig(paneId: string, values: Partial<Omit<PaneConfig, "id">>) {
@@ -513,17 +533,25 @@ export class PaneHost {
             sessions: this.store.get().sessions.map(s => ({ id: s.id, user: s.user })),
             panes: this.panes.map(p => ({ ...p.data })),
         };
-        this.send("layout", layout);
+        this.sendToSideBars("layout", layout);
     }
 
     private send<K extends keyof MainToHostChannels>(channel: K, ...args: MainToHostChannels[K]) {
         this.window.webContents.send(channel, ...args);
     }
 
+    // Sends a message that the side bar view needs as well as the host renderer.
+    private sendToSideBars<K extends keyof MainToHostChannels>(channel: K, ...args: MainToHostChannels[K]) {
+        this.send(channel, ...args);
+        this.sideBarView.webContents.send(channel, ...args);
+    }
+
     // Arguments from the renderer are typed as unknown because they must be validated before use.
     private on<K extends keyof HostToMainChannels>(channel: K, callback: (...args: Unvalidated<HostToMainChannels[K]>) => void) {
-        this.window.webContents.ipc.on(channel, (event, ...args) => {
-            (callback as (...args: unknown[]) => void)(...args);
-        });
+        for (const webContents of [this.window.webContents, this.sideBarView.webContents]) {
+            webContents.ipc.on(channel, (event, ...args) => {
+                (callback as (...args: unknown[]) => void)(...args);
+            });
+        }
     }
 }

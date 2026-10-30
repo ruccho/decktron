@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Rectangle, screen } from "electron";
+import { BrowserWindow, Rectangle, screen } from "electron";
 import { join } from "node:path";
 import { PaneHost } from "./PaneHost";
 import { LayoutStore } from "./LayoutStore";
+import { loadRenderer } from "./loadRenderer";
 import { WindowConfig } from "../shared/common";
 
 // Returns true if the bounds overlap a display enough to be grabbed by the user.
@@ -58,12 +59,7 @@ export class Decktron {
 
         this.paneHost = new PaneHost(mainWindow, this.store);
 
-        const rendererUrl = process.env["ELECTRON_RENDERER_URL"];
-        if (!app.isPackaged && rendererUrl) {
-            mainWindow.loadURL(rendererUrl);
-        } else {
-            mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
-        }
+        loadRenderer(mainWindow.webContents);
     }
 
     private readonly store: LayoutStore;

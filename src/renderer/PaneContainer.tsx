@@ -54,20 +54,14 @@ const PaneContainer: React.FC<{
             const container = paneContainer.current;
             if (!container) return;
 
-            // The main process clips the pages to the container's client area, excluding the scroll bar.
-            const containerRect = container.getBoundingClientRect();
-            const clientRect: Rect = {
-                x: containerRect.left + container.clientLeft,
-                y: containerRect.top + container.clientTop,
-                width: container.clientWidth,
-                height: container.clientHeight,
-            };
+            // The side bar view covers the pages scrolled to the left of the container.
+            const sideBarWidth = container.getBoundingClientRect().left;
             const bounds: Record<string, Rect> = {};
             for (const [id, element] of contentElements.current) {
                 const rect = element.getBoundingClientRect();
                 bounds[id] = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
             }
-            window.decktron.send("pane-bounds", clientRect, bounds);
+            window.decktron.send("pane-bounds", sideBarWidth, bounds);
         });
     }, []);
 
